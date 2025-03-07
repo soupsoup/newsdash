@@ -2,119 +2,30 @@ import { Express } from "express";
 import { IStorage } from "../storage";
 import { InsertNewsItem } from "../../shared/schema";
 import fetch from "node-fetch";
+import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems } from "../utils/twitterScraper";
 
-// Twitter/X API endpoints would normally use a Twitter API client
-// but we'll implement the core functionality without dependencies
+// Twitter/X API endpoints would use a mix of API client and web scraping
+// depending on what's available and the requirements
 
-// Simulated DeItaone tweets
-const DELTA_ONE_TWEETS = [
-  {
-    id: "1768265371583541248",
-    text: "*GOLDMAN RAISES S&P 500 TARGET TO 5,200 FROM 5,100",
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone",
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768254838435152143",
-    text: "*FED SURVEY: HOUSEHOLD FINANCES IMPROVED BROADLY IN LATE 2023",
-    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone",
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768253123485958345",
-    text: "*JPMORGAN'S KOLANOVIC SAYS 'MAXIMUM GREED' HAS TAKEN OVER MARKETS",
-    created_at: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone",
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768249988782424370",
-    text: "*SENATE PANEL PASSES BILL TO BAN TIKTOK IF BYTEDANCE DOESN'T SELL IT",
-    created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone",
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768243923468488923",
-    text: "*US MARCH MICHIGAN SENTIMENT INDEX FALLS TO 76.5; EST. 77.0",
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone",
-      name: "Delta One", 
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768083465324146123",
-    text: "*JPMORGAN STRATEGISTS SAY STOCKS FACE 10% DROP IN A CORRECTION",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898", 
-      username: "DeItaone",
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  },
-  {
-    id: "1768032284953178542",
-    text: "*CORE US CPI RISES 0.4% M/M; EST. 0.3%; MOST SINCE SEPT. 2023",
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    user: {
-      id: "1156910898",
-      username: "DeItaone", 
-      name: "Delta One",
-      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
-    }
-  }
-];
-
-// Helper function to convert tweets to news items
-function tweetsToNewsItems(tweets: any[], sourceName: string): InsertNewsItem[] {
-  return tweets.map(tweet => {
-    // Format metadata as a valid Record<string, any>
-    const metadata: Record<string, any> = {
-      tweetId: tweet.id,
-      userId: tweet.user.id,
-      username: tweet.user.username,
-      timestamp: tweet.created_at,
-      profileImageUrl: tweet.user.profile_image_url
-    };
+/**
+ * Fetches tweets from a Twitter/X user profile
+ * @param username The Twitter username to fetch tweets from
+ * @param limit Maximum number of tweets to fetch
+ * @returns Array of tweet objects
+ */
+async function fetchTweetsFromUser(username: string, limit = 7): Promise<any[]> {
+  try {
+    console.log(`Fetching tweets from user: ${username} (limit: ${limit})`);
     
-    return {
-      title: tweet.text,
-      content: tweet.text,
-      source: `X/Twitter: ${sourceName}`,
-      sourceType: "twitter",
-      externalId: tweet.id,
-      metadata,
-    };
-  });
-}
-
-// Simulated function to fetch tweets from DeItaone
-async function fetchTweetsFromDeItaone(limit = 5): Promise<any[]> {
-  // In a real implementation, we would use the Twitter API
-  // For now, return our simulated tweets
-  return DELTA_ONE_TWEETS.slice(0, limit);
+    // Use our scraper to get the tweets
+    const tweets = await scrapeTweetsFromProfile(username, limit);
+    console.log(`Successfully fetched ${tweets.length} tweets from ${username}`);
+    
+    return tweets;
+  } catch (error) {
+    console.error(`Error fetching tweets from ${username}:`, error);
+    throw error;
+  }
 }
 
 // Function to periodically check for new tweets
@@ -141,13 +52,13 @@ function startPeriodicTwitterSync(storage: IStorage) {
           const config = integration.additionalConfig as Record<string, unknown> || {};
           const username = (config.username as string) || "DeItaone";
           
-          // Fetch tweets
+          // Fetch tweets using our scraper
           console.log(`[Periodic Sync] Fetching tweets from ${username}`);
-          const tweets = await fetchTweetsFromDeItaone(5);
+          const tweets = await fetchTweetsFromUser(username, 5);
           console.log(`[Periodic Sync] Fetched ${tweets.length} tweets from ${username}`);
           
           // Convert tweets to news items
-          const newsItems = tweetsToNewsItems(tweets, integration.name);
+          const newsItems = scrapedTweetsToNewsItems(tweets, integration.name);
           
           // Store new items
           let itemsCreated = 0;
@@ -201,13 +112,13 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           const config = integration.additionalConfig as Record<string, unknown> || {};
           const username = (config.username as string) || "DeItaone";
           
-          // Fetch tweets from DeItaone using our helper function
+          // Fetch tweets using our scraper
           console.log(`Fetching tweets from ${username}`);
-          const tweets = await fetchTweetsFromDeItaone(7);
+          const tweets = await fetchTweetsFromUser(username, 7);
           console.log(`Fetched ${tweets.length} tweets from ${username}`);
           
           // Convert tweets to news items
-          const newsItems = tweetsToNewsItems(tweets, integration.name);
+          const newsItems = scrapedTweetsToNewsItems(tweets, integration.name);
           
           // Store the news items
           const createdItems = [];
