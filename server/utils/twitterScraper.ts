@@ -652,79 +652,191 @@ async function scrapeFromNitter(username: string, maxTweets = 10): Promise<Scrap
 /**
  * Direct scraping from X.com using a simple fetch request
  * This is less reliable than Puppeteer but works in more restricted environments
+ * Now improved to better handle X.com's layout and extract more content
  */
 async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
   try {
-    const url = `https://x.com/${username}`;
-    console.log(`Fetching directly from: ${url}`);
+    // Try both URLs for better coverage
+    const urls = [
+      `https://x.com/${username}`,
+      `https://twitter.com/${username}`
+    ];
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-    
-    if (!response.ok) {
-      console.log(`Failed to fetch from X.com: ${response.status} ${response.statusText}`);
-      return [];
-    }
-    
-    const html = await response.text();
-    const $ = cheerio.load(html);
     const tweets: ScrapedTweet[] = [];
     
-    // X.com/Twitter has a complex structure, especially with React/JS rendering
-    // This approach has limitations but might catch some content
-    $('article').each((index, element) => {
-      if (tweets.length >= maxTweets) return;
+    for (const url of urls) {
+      if (tweets.length >= maxTweets) break;
       
       try {
-        // Try to extract the tweet ID from the article
-        const tweetLink = $(element).find('a[href*="/status/"]').attr('href');
-        if (!tweetLink) return;
+        console.log(`Fetching directly from: ${url}`);
         
-        const tweetId = tweetLink.split('/status/')[1];
-        if (!tweetId) return;
-        
-        // Extract tweet text - different selectors to try
-        let tweetText = '';
-        $(element).find('[data-testid="tweetText"]').each((i, el) => {
-          tweetText += $(el).text();
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'max-age=0',
+            'Referer': 'https://www.google.com/'
+          },
+          // Set a timeout to avoid hanging
+          signal: AbortSignal.timeout(10000)
         });
         
-        // If no text with the testid, try other common elements
-        if (!tweetText) {
-          // Look for paragraphs that might contain the tweet text
-          $(element).find('p').each((i, el) => {
-            const potentialText = $(el).text().trim();
-            if (potentialText && potentialText.length > 5) {
-              tweetText = potentialText;
+        if (!response.ok) {
+          console.log(`Failed to fetch from ${url}: ${response.status} ${response.statusText}`);
+          continue;
+        }
+        
+        const html = await response.text();
+        
+        // Check if we've been blocked or redirected to login
+        if (html.includes('Login to X') || html.includes('Sign in to X') || 
+            html.includes('Login to Twitter') || html.includes('Sign in to Twitter')) {
+          console.log(`X.com requires login, can't scrape directly`);
+          continue;
+        }
+        
+        // Try to extract JSON data from the page - X.com embeds data in script tags
+        const jsonMatches = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s) ||
+                            html.match(/window\._sharedData = (.*?);<\/script>/s);
+        
+        if (jsonMatches && jsonMatches[1]) {
+          try {
+            // Try to parse the JSON data
+            const jsonData = JSON.parse(jsonMatches[1]);
+            console.log('Found embedded JSON data in X.com page');
+            
+            // Search for tweets in the JSON structure (different versions have different structures)
+            const extractedTweets = findTweetsInJsonData(jsonData, username, maxTweets);
+            if (extractedTweets.length > 0) {
+              tweets.push(...extractedTweets);
+              console.log(`Extracted ${extractedTweets.length} tweets from JSON data`);
+              continue;
+            }
+          } catch (jsonErr) {
+            console.error('Failed to parse JSON from X.com page:', jsonErr);
+          }
+        }
+        
+        // Fallback to HTML parsing if JSON approach fails
+        const $ = cheerio.load(html);
+        
+        // Try multiple selectors that might contain tweets
+        const selectors = [
+          'article', 
+          '[data-testid="tweet"]', 
+          '.timeline-tweet',
+          '.tweet'
+        ];
+        
+        for (const selector of selectors) {
+          if (tweets.length >= maxTweets) break;
+          
+          $(selector).each((index, element) => {
+            if (tweets.length >= maxTweets) return;
+            
+            try {
+              // Try to extract the tweet ID from the article
+              const tweetLink = $(element).find('a[href*="/status/"]').attr('href');
+              if (!tweetLink) return;
+              
+              const tweetIdMatch = tweetLink.match(/\/status\/(\d+)/) || tweetLink.split('/status/');
+              const tweetId = tweetIdMatch && tweetIdMatch.length > 1 ? tweetIdMatch[1] : null;
+              if (!tweetId) return;
+              
+              // Extract tweet text using multiple possible selectors
+              let tweetText = '';
+              
+              // Try different selectors for tweet text
+              const textSelectors = [
+                '[data-testid="tweetText"]', 
+                '.tweet-text', 
+                '.timeline-Tweet-text', 
+                'p', 
+                '.tweet-content',
+                '[dir="auto"]'
+              ];
+              
+              for (const textSelector of textSelectors) {
+                if (tweetText) break;
+                
+                $(element).find(textSelector).each((i, el) => {
+                  const text = $(el).text().trim();
+                  if (text && text.length > 5 && !tweetText) {
+                    tweetText = text;
+                  }
+                });
+              }
+              
+              // If still no text, try the article text itself
+              if (!tweetText) {
+                tweetText = $(element).text().trim();
+                
+                // Try to clean up extracted text (remove extraneous elements)
+                tweetText = tweetText
+                  .replace(/(\d+) replies?/g, '')
+                  .replace(/(\d+) retweets?/g, '')
+                  .replace(/(\d+) likes?/g, '')
+                  .replace(/(@\w+)/g, ' $1 ')  // Add spaces around mentions
+                  .replace(/\s+/g, ' ')        // Normalize whitespace
+                  .trim();
+              }
+              
+              // If still no meaningful text, skip this tweet
+              if (!tweetText || tweetText.length < 5) return;
+              
+              // Create unique ID based on the tweet ID
+              const uniqueId = `x-${tweetId}-${Date.now().toString().slice(-4)}`;
+              
+              // Try to extract timestamp
+              let timestamp = new Date().toISOString(); // Default to now
+              
+              // Look for timestamps with different formats
+              const timeElement = $(element).find('time').attr('datetime') || 
+                                 $(element).find('[datetime]').attr('datetime');
+              
+              if (timeElement) {
+                try {
+                  timestamp = new Date(timeElement).toISOString();
+                } catch (timeErr) {
+                  // Ignore time parsing errors
+                }
+              }
+              
+              // For DeItaone, check if this is a financial tweet
+              const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+              if (isDeItaone) {
+                // Check if this is a financial tweet using our expanded criteria
+                const isFinancial = 
+                  tweetText.startsWith('*') || 
+                  tweetText.toUpperCase() === tweetText || // All caps is often important
+                  /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
+                  /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+                
+                if (!isFinancial) return;
+              }
+              
+              // Add to our collection
+              tweets.push({
+                id: uniqueId,
+                text: tweetText,
+                created_at: timestamp,
+                user: {
+                  id: username,
+                  username: username,
+                  name: username === 'DeItaone' ? 'Delta One' : username,
+                  profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                }
+              });
+            } catch (err) {
+              console.error('Error parsing X.com tweet:', err);
             }
           });
         }
-        
-        // If still no text, skip this tweet
-        if (!tweetText) return;
-        
-        // Create unique ID based on the tweet ID
-        const uniqueId = `x-${tweetId}-${Date.now().toString().slice(-4)}`;
-        
-        // Add to our collection
-        tweets.push({
-          id: uniqueId,
-          text: tweetText,
-          created_at: new Date().toISOString(), // Use current time since exact time is hard to parse
-          user: {
-            id: username,
-            username: username,
-            name: username === 'DeItaone' ? 'Delta One' : username,
-            profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
-          }
-        });
-      } catch (err) {
-        console.error('Error parsing X.com tweet:', err);
+      } catch (urlError) {
+        console.error(`Error fetching from ${url}:`, urlError);
       }
-    });
+    }
     
     console.log(`Extracted ${tweets.length} tweets directly from X.com for @${username}`);
     return tweets;
@@ -732,6 +844,95 @@ async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<Scra
     console.error('Error in direct X.com scraping:', error);
     return [];
   }
+}
+
+/**
+ * Helper function to find tweets in the JSON data embedded in X.com pages
+ * Twitter/X constantly changes their data structure, so this function tries various patterns
+ */
+function findTweetsInJsonData(jsonData: any, username: string, maxTweets: number): ScrapedTweet[] {
+  const tweets: ScrapedTweet[] = [];
+  
+  try {
+    // Recursively search for tweet-like objects in the JSON
+    function searchForTweets(obj: any, path: string = '') {
+      if (!obj || tweets.length >= maxTweets) return;
+      
+      // If it's an array, search each item
+      if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+          if (tweets.length >= maxTweets) break;
+          searchForTweets(obj[i], `${path}[${i}]`);
+        }
+        return;
+      }
+      
+      // If it's an object, check if it might be a tweet
+      if (typeof obj === 'object') {
+        // Check if this object has tweet-like properties
+        if (
+          (obj.full_text || obj.text) && 
+          (obj.id_str || obj.id) &&
+          (obj.created_at || obj.timestamp)
+        ) {
+          const tweetText = obj.full_text || obj.text;
+          const tweetId = obj.id_str || obj.id;
+          const createdAt = obj.created_at || obj.timestamp;
+          
+          // For DeItaone, check if this is a financial tweet
+          const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+          if (isDeItaone) {
+            // Check if this is a financial tweet using our expanded criteria
+            const isFinancial = 
+              tweetText.startsWith('*') || 
+              tweetText.toUpperCase() === tweetText || // All caps is often important
+              /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
+              /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+            
+            if (!isFinancial) return;
+          }
+          
+          // Create a timestamp
+          let timestamp;
+          try {
+            timestamp = new Date(createdAt).toISOString();
+          } catch (e) {
+            timestamp = new Date().toISOString();
+          }
+          
+          // Add the tweet to our collection
+          tweets.push({
+            id: `json-${tweetId}`,
+            text: tweetText,
+            created_at: timestamp,
+            user: {
+              id: username,
+              username: username,
+              name: username === 'DeItaone' ? 'Delta One' : username,
+              profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+            }
+          });
+          
+          return;
+        }
+        
+        // Continue searching in this object's properties
+        for (const key in obj) {
+          if (tweets.length >= maxTweets) break;
+          searchForTweets(obj[key], `${path}.${key}`);
+        }
+      }
+    }
+    
+    // Start the recursive search
+    searchForTweets(jsonData);
+    
+    console.log(`Found ${tweets.length} tweets in JSON data for @${username}`);
+  } catch (error) {
+    console.error('Error searching for tweets in JSON data:', error);
+  }
+  
+  return tweets;
 }
 
 /**

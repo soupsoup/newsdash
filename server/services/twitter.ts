@@ -13,7 +13,7 @@ import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems 
  * @param limit Maximum number of tweets to fetch
  * @returns Array of tweet objects
  */
-async function fetchTweetsFromUser(username: string, limit = 7): Promise<{
+async function fetchTweetsFromUser(username: string, limit = 15): Promise<{
   tweets: any[],
   success: boolean,
   error?: string,
@@ -100,9 +100,9 @@ function startPeriodicTwitterSync(storage: IStorage) {
           const config = integration.additionalConfig as Record<string, unknown> || {};
           const username = (config.username as string) || "DeItaone";
           
-          // Fetch tweets using our scraper
+          // Fetch tweets using our scraper with increased limit for better detection of financial tweets
           console.log(`[Periodic Sync] Fetching tweets from ${username}`);
-          const result = await fetchTweetsFromUser(username, 5);
+          const result = await fetchTweetsFromUser(username, 15);
           
           // Check if we got any tweets
           if (!result.success || result.tweets.length === 0) {
@@ -189,9 +189,9 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           const config = integration.additionalConfig as Record<string, unknown> || {};
           const username = (config.username as string) || "DeItaone";
           
-          // Fetch tweets using our scraper
+          // Fetch tweets using our scraper with increased limit to better capture recent financial tweets
           console.log(`Fetching tweets from ${username}`);
-          const result = await fetchTweetsFromUser(username, 7);
+          const result = await fetchTweetsFromUser(username, 20);
           
           // Check if we got any tweets
           if (!result.success || result.tweets.length === 0) {
