@@ -55,10 +55,13 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
       try {
         console.log(`Trying Twitter service: ${service.type} via ${service.url}`);
         
+        // Define default headers that are guaranteed to be a valid HeadersInit
+        const defaultHeaders = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        };
+        
         const response = await fetch(service.url, {
-          headers: service.headers || {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          },
+          headers: service.headers ? service.headers : defaultHeaders,
           // Set a reasonable timeout
           signal: AbortSignal.timeout(10000)
         });
@@ -243,8 +246,9 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
               const tweets: ScrapedTweet[] = [];
               
               // Log the first item for debugging
-              if (items.length > 0) {
-                console.log(`RSS Sample item content: ${items[0].substring(0, 150)}...`);
+              if (items.length > 0 && items[0]) {
+                const sampleContent = items[0].substring(0, 150);
+                console.log(`RSS Sample item content: ${sampleContent}...`);
               }
               
               // Improved parsing for Nitter RSS format
@@ -697,8 +701,9 @@ async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<Scra
         }
         
         // Try to extract JSON data from the page - X.com embeds data in script tags
-        const jsonMatches = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s) ||
-                            html.match(/window\._sharedData = (.*?);<\/script>/s);
+        // Removed 's' flag which is not supported in ES5
+        const jsonMatches = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/) ||
+                            html.match(/window\._sharedData = ([\s\S]*?);<\/script>/);
         
         if (jsonMatches && jsonMatches[1]) {
           try {
@@ -850,82 +855,82 @@ async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<Scra
  * Helper function to find tweets in the JSON data embedded in X.com pages
  * Twitter/X constantly changes their data structure, so this function tries various patterns
  */
+// Helper function to search for tweets in a JSON object
+function searchForTweets(obj: any, username: string, maxTweets: number, tweets: ScrapedTweet[], path: string = ''): void {
+  if (!obj || tweets.length >= maxTweets) return;
+  
+  // If it's an array, search each item
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      if (tweets.length >= maxTweets) break;
+      searchForTweets(obj[i], username, maxTweets, tweets, `${path}[${i}]`);
+    }
+    return;
+  }
+  
+  // If it's an object, check if it might be a tweet
+  if (typeof obj === 'object') {
+    // Check if this object has tweet-like properties
+    if (
+      (obj.full_text || obj.text) && 
+      (obj.id_str || obj.id) &&
+      (obj.created_at || obj.timestamp)
+    ) {
+      const tweetText = obj.full_text || obj.text;
+      const tweetId = obj.id_str || obj.id;
+      const createdAt = obj.created_at || obj.timestamp;
+      
+      // For DeItaone, check if this is a financial tweet
+      const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+      if (isDeItaone) {
+        // Check if this is a financial tweet using our expanded criteria
+        const isFinancial = 
+          tweetText.startsWith('*') || 
+          tweetText.toUpperCase() === tweetText || // All caps is often important
+          /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
+          /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+        
+        if (!isFinancial) return;
+      }
+      
+      // Create a timestamp
+      let timestamp;
+      try {
+        timestamp = new Date(createdAt).toISOString();
+      } catch (e) {
+        timestamp = new Date().toISOString();
+      }
+      
+      // Add the tweet to our collection
+      tweets.push({
+        id: `json-${tweetId}`,
+        text: tweetText,
+        created_at: timestamp,
+        user: {
+          id: username,
+          username: username,
+          name: username === 'DeItaone' ? 'Delta One' : username,
+          profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+        }
+      });
+      
+      return;
+    }
+    
+    // Continue searching in this object's properties
+    for (const key in obj) {
+      if (tweets.length >= maxTweets) break;
+      searchForTweets(obj[key], username, maxTweets, tweets, `${path}.${key}`);
+    }
+  }
+}
+
 function findTweetsInJsonData(jsonData: any, username: string, maxTweets: number): ScrapedTweet[] {
   const tweets: ScrapedTweet[] = [];
   
   try {
-    // Recursively search for tweet-like objects in the JSON
-    function searchForTweets(obj: any, path: string = '') {
-      if (!obj || tweets.length >= maxTweets) return;
-      
-      // If it's an array, search each item
-      if (Array.isArray(obj)) {
-        for (let i = 0; i < obj.length; i++) {
-          if (tweets.length >= maxTweets) break;
-          searchForTweets(obj[i], `${path}[${i}]`);
-        }
-        return;
-      }
-      
-      // If it's an object, check if it might be a tweet
-      if (typeof obj === 'object') {
-        // Check if this object has tweet-like properties
-        if (
-          (obj.full_text || obj.text) && 
-          (obj.id_str || obj.id) &&
-          (obj.created_at || obj.timestamp)
-        ) {
-          const tweetText = obj.full_text || obj.text;
-          const tweetId = obj.id_str || obj.id;
-          const createdAt = obj.created_at || obj.timestamp;
-          
-          // For DeItaone, check if this is a financial tweet
-          const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
-          if (isDeItaone) {
-            // Check if this is a financial tweet using our expanded criteria
-            const isFinancial = 
-              tweetText.startsWith('*') || 
-              tweetText.toUpperCase() === tweetText || // All caps is often important
-              /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
-              /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
-            
-            if (!isFinancial) return;
-          }
-          
-          // Create a timestamp
-          let timestamp;
-          try {
-            timestamp = new Date(createdAt).toISOString();
-          } catch (e) {
-            timestamp = new Date().toISOString();
-          }
-          
-          // Add the tweet to our collection
-          tweets.push({
-            id: `json-${tweetId}`,
-            text: tweetText,
-            created_at: timestamp,
-            user: {
-              id: username,
-              username: username,
-              name: username === 'DeItaone' ? 'Delta One' : username,
-              profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
-            }
-          });
-          
-          return;
-        }
-        
-        // Continue searching in this object's properties
-        for (const key in obj) {
-          if (tweets.length >= maxTweets) break;
-          searchForTweets(obj[key], `${path}.${key}`);
-        }
-      }
-    }
-    
-    // Start the recursive search
-    searchForTweets(jsonData);
+    // Start the recursive search with the helper function
+    searchForTweets(jsonData, username, maxTweets, tweets);
     
     console.log(`Found ${tweets.length} tweets in JSON data for @${username}`);
   } catch (error) {
