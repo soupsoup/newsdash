@@ -105,6 +105,26 @@ const DataSources = () => {
               <li>Our system is optimized to work best with @DeItaone tweets</li>
             </ol>
           </div>
+          
+          {twitterSource?.status === "error" && (
+            <div className="p-4 mb-4 border-l-4 border-red-500 bg-red-50 text-red-800">
+              <h4 className="text-sm font-bold mb-2">Source Error</h4>
+              <p className="text-xs mb-2">
+                We're unable to retrieve real Twitter data at this time. Our system is not using mock data as per requirements.
+              </p>
+              <p className="text-xs font-medium">
+                Possible reasons:
+              </p>
+              <ul className="text-xs list-disc ml-4 space-y-1 mb-2">
+                <li>Web scraping limitations in the current environment</li>
+                <li>Twitter's access restrictions for non-API access</li>
+                <li>Network connectivity issues</li>
+              </ul>
+              <p className="text-xs">
+                Try clicking "Sync Now" to attempt to fetch data again.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="username">Twitter/X Username</Label>
@@ -131,8 +151,26 @@ const DataSources = () => {
             <p className="text-xs text-[#757575]">
               {twitterSource?.status === "connected" 
                 ? "Currently fetching tweets from Twitter/X" 
+                : twitterSource?.status === "error"
+                ? "Source is reporting errors - see above"
                 : "Source is currently inactive"}
             </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <div className="flex items-center">
+              <div className={`w-3 h-3 rounded-full mr-2 ${
+                twitterSource?.status === "connected" ? "bg-green-500" :
+                twitterSource?.status === "error" ? "bg-red-500" :
+                "bg-gray-400"
+              }`}></div>
+              <span className="text-sm">
+                {twitterSource?.status === "connected" ? "Connected" :
+                 twitterSource?.status === "error" ? "Error" :
+                 "Disconnected"}
+              </span>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="justify-end">
@@ -141,29 +179,36 @@ const DataSources = () => {
               variant="outline"
               onClick={async () => {
                 try {
+                  toast({
+                    title: "Syncing...",
+                    description: "Attempting to retrieve tweets from Twitter/X",
+                  });
+                  
                   const response = await fetch('/api/integrations/twitter/sync', {
                     method: 'POST',
                   });
                   const data = await response.json();
                   
-                  if (response.ok && data.results && data.results.length > 0) {
-                    const result = data.results[0];
-                    if (result.success) {
-                      toast({
-                        title: "Sync Successful",
-                        description: `Fetched ${result.totalFetched} tweets, added ${result.itemsCreated} new items`,
-                      });
-                    } else {
-                      toast({
-                        title: "Sync Failed",
-                        description: result.error || "Unknown error occurred",
-                        variant: "destructive",
-                      });
+                  if (response.ok && data.success) {
+                    if (data.results && data.results.length > 0) {
+                      const result = data.results[0];
+                      if (result.success) {
+                        toast({
+                          title: "Sync Successful",
+                          description: `Fetched ${result.totalFetched} tweets, added ${result.itemsCreated} new items`,
+                        });
+                      } else {
+                        toast({
+                          title: "Real-time Data Unavailable",
+                          description: result.error || "Unable to retrieve real Twitter data. No mock data will be used.",
+                          variant: "destructive",
+                        });
+                      }
                     }
                   } else {
                     toast({
-                      title: "Sync Failed",
-                      description: "Failed to sync with Twitter/X",
+                      title: "Real-time Data Unavailable",
+                      description: data.message || "Failed to retrieve real Twitter data. No mock data will be used.",
                       variant: "destructive",
                     });
                   }
@@ -173,9 +218,12 @@ const DataSources = () => {
                 } catch (error) {
                   toast({
                     title: "Sync Error",
-                    description: "An error occurred while syncing with Twitter/X",
+                    description: "Error connecting to Twitter service. No mock data will be used.",
                     variant: "destructive",
                   });
+                  
+                  // Refresh the integrations data
+                  refreshIntegrations();
                 }
               }}
             >

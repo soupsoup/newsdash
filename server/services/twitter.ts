@@ -65,6 +65,19 @@ function startPeriodicTwitterSync(storage: IStorage) {
           // Fetch tweets using our scraper
           console.log(`[Periodic Sync] Fetching tweets from ${username}`);
           const tweets = await fetchTweetsFromUser(username, 5);
+          
+          // Check if we got any tweets
+          if (tweets.length === 0) {
+            // Update the integration to show it's having issues
+            await storage.updateIntegration(integration.id, {
+              status: "error",
+              lastSyncAt: new Date()
+            });
+            
+            console.log(`[Periodic Sync] Failed to retrieve tweets from @${username}. No mock data will be used.`);
+            continue;
+          }
+          
           console.log(`[Periodic Sync] Fetched ${tweets.length} tweets from ${username}`);
           
           // Convert tweets to news items
@@ -83,14 +96,21 @@ function startPeriodicTwitterSync(storage: IStorage) {
             }
           }
 
-          // Update the integration's lastSyncAt time
+          // Update the integration's lastSyncAt time and status
           await storage.updateIntegration(integration.id, {
             lastSyncAt: new Date(),
+            status: "connected"
           });
 
           console.log(`[Periodic Sync] Completed Twitter sync for integration ${integration.id}, created ${itemsCreated} new items`);
         } catch (err) {
           console.error(`[Periodic Sync] Twitter sync error for integration ${integration.id}:`, err);
+          
+          // Update the integration to show it's having issues
+          await storage.updateIntegration(integration.id, {
+            status: "error",
+            lastSyncAt: new Date()
+          });
         }
       }
     } catch (error) {
@@ -110,7 +130,10 @@ export function setupTwitterService(app: Express, storage: IStorage) {
       );
 
       if (activeIntegrations.length === 0) {
-        return res.status(400).json({ message: "No active Twitter integrations found" });
+        return res.status(400).json({ 
+          success: false,
+          message: "No active Twitter integrations found" 
+        });
       }
 
       const syncResults = [];
@@ -125,6 +148,24 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           // Fetch tweets using our scraper
           console.log(`Fetching tweets from ${username}`);
           const tweets = await fetchTweetsFromUser(username, 7);
+          
+          // Check if we got any tweets
+          if (tweets.length === 0) {
+            // Update the integration to show it's having issues
+            await storage.updateIntegration(integration.id, {
+              status: "error",
+              lastSyncAt: new Date(),
+            });
+            
+            syncResults.push({
+              integrationId: integration.id,
+              name: integration.name,
+              success: false,
+              error: `Unable to retrieve tweets from @${username}. Web scraping failed and no mock data is being used as per requirements.`
+            });
+            continue;
+          }
+          
           console.log(`Fetched ${tweets.length} tweets from ${username}`);
           
           // Convert tweets to news items
@@ -143,9 +184,10 @@ export function setupTwitterService(app: Express, storage: IStorage) {
             }
           }
 
-          // Update the integration's lastSyncAt time
+          // Update the integration's lastSyncAt time and status
           await storage.updateIntegration(integration.id, {
             lastSyncAt: new Date(),
+            status: "connected"
           });
 
           syncResults.push({
@@ -157,22 +199,45 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           });
         } catch (err) {
           console.error(`Twitter sync error for integration ${integration.id}:`, err);
+          
+          // Update the integration to show it's having issues
+          await storage.updateIntegration(integration.id, {
+            status: "error",
+            lastSyncAt: new Date(),
+          });
+          
           syncResults.push({
             integrationId: integration.id,
             name: integration.name,
             success: false,
-            error: (err as Error).message,
+            error: `Error accessing Twitter data: ${(err as Error).message}. No mock data is being used as per requirements.`
           });
         }
       }
 
+      // Check if any sync was successful
+      const anySuccess = syncResults.some(result => result.success);
+      
+      if (!anySuccess) {
+        return res.status(400).json({
+          success: false,
+          message: "Failed to retrieve real Twitter data. No mock data will be used.",
+          results: syncResults,
+        });
+      }
+
       res.json({
+        success: true,
         message: "Twitter sync completed",
         results: syncResults,
       });
     } catch (error) {
       console.error("Twitter sync error:", error);
-      res.status(500).json({ message: "Twitter sync processing error" });
+      res.status(500).json({ 
+        success: false,
+        message: "Twitter sync processing error", 
+        error: (error as Error).message 
+      });
     }
   });
 

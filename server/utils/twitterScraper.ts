@@ -120,16 +120,10 @@ export async function scrapeTweetsFromProfile(username: string, maxTweets = 10):
     }
   } catch (error) {
     console.error('Error scraping tweets:', error);
-    console.log('Scraping failed, using dynamic fallback data');
-    
-    // First try to use dynamic fallback data
-    const isRestrictedEnvironment = process.env.REPL_ID || process.env.REPL_SLUG || process.env.REPLIT;
-    if (isRestrictedEnvironment) {
-      return getDynamicFallbackTweets(username);
-    }
-    
-    // If not in a restricted environment, use static fallback
-    return getFallbackTweets(username);
+    console.log('Scraping failed - no fallback data will be used as per requirements');
+    // As per requirements, we don't use fallback data
+    // Instead return an empty array and let the calling code handle the error appropriately
+    return [];
   }
 }
 
