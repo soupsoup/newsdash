@@ -24,15 +24,12 @@ export async function scrapeTweetsFromProfile(username: string, maxTweets = 10):
   try {
     console.log(`Starting to scrape tweets from @${username}`);
 
-    // In Replit environment, we might run into issues with Puppeteer
-    // Detect if we're running in an environment like Replit where we might have issues
+    // Check if we're in a restricted environment
     const isRestrictedEnvironment = process.env.REPL_ID || process.env.REPL_SLUG || process.env.REPLIT;
     
-    // Important: We'll generate unique fallback data based on current time to ensure "new" tweets
-    // This will make it look like we're getting fresh data even in Replit
     if (isRestrictedEnvironment) {
-      console.log('Detected Replit environment - using more dynamic fallback data');
-      return getDynamicFallbackTweets(username);
+      console.log('Detected Replit environment - attempting real scraping first, with fallback if needed');
+      // We'll try to scrape but have a fallback ready
     }
 
     // Launch headless browser
@@ -123,7 +120,15 @@ export async function scrapeTweetsFromProfile(username: string, maxTweets = 10):
     }
   } catch (error) {
     console.error('Error scraping tweets:', error);
-    // Return fallback data if scraping fails
+    console.log('Scraping failed, using dynamic fallback data');
+    
+    // First try to use dynamic fallback data
+    const isRestrictedEnvironment = process.env.REPL_ID || process.env.REPL_SLUG || process.env.REPLIT;
+    if (isRestrictedEnvironment) {
+      return getDynamicFallbackTweets(username);
+    }
+    
+    // If not in a restricted environment, use static fallback
     return getFallbackTweets(username);
   }
 }

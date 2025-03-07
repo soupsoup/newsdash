@@ -15,11 +15,21 @@ import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems 
  */
 async function fetchTweetsFromUser(username: string, limit = 7): Promise<any[]> {
   try {
-    console.log(`Fetching tweets from user: ${username} (limit: ${limit})`);
+    console.log(`Fetching tweets from ${username}`);
+    
+    // Normalize the username (X.com and Twitter.com usernames may have @ symbols)
+    const normalizedUsername = username.startsWith('@') 
+      ? username.substring(1) 
+      : username;
+      
+    // Handle common username variations for DeItaone
+    const finalUsername = normalizedUsername.toLowerCase() === 'deltaone' 
+      ? 'DeItaone' 
+      : normalizedUsername;
     
     // Use our scraper to get the tweets
-    const tweets = await scrapeTweetsFromProfile(username, limit);
-    console.log(`Successfully fetched ${tweets.length} tweets from ${username}`);
+    const tweets = await scrapeTweetsFromProfile(finalUsername, limit);
+    console.log(`Fetched ${tweets.length} tweets from ${finalUsername}`);
     
     return tweets;
   } catch (error) {
