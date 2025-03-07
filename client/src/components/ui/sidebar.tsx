@@ -27,62 +27,68 @@ const Sidebar = () => {
           Dashboard
         </p>
         
-        <Link href="/">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3 text-[#1976d2]">dashboard</span>
-            <span>Overview</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3 text-[#1976d2]">dashboard</span>
+          <span>Overview</span>
         </Link>
         
-        <Link href="/news-feed">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/news-feed" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/news-feed") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3">article</span>
-            <span>News Feed</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3">article</span>
+          <span>News Feed</span>
         </Link>
         
-        <Link href="/distribution">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/distribution" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/distribution") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3">share</span>
-            <span>Distribution</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3">share</span>
+          <span>Distribution</span>
         </Link>
         
         <p className="text-xs uppercase text-[#757575] font-medium tracking-wider mt-6 mb-2 ml-2">
           Admin
         </p>
         
-        <Link href="/integrations">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/integrations" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/integrations") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3">settings_input_component</span>
-            <span>Integrations</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3">settings_input_component</span>
+          <span>Integrations</span>
         </Link>
         
-        <Link href="/data-sources">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/data-sources" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/data-sources") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3">source</span>
-            <span>Data Sources</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3">source</span>
+          <span>Data Sources</span>
         </Link>
         
-        <Link href="/settings">
-          <a className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+        <Link 
+          href="/settings" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
             isActive("/settings") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
-          }`}>
-            <span className="material-icons mr-3">settings</span>
-            <span>Settings</span>
-          </a>
+          }`}
+        >
+          <span className="material-icons mr-3">settings</span>
+          <span>Settings</span>
         </Link>
       </nav>
       
