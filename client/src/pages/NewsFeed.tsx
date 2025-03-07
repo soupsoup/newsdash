@@ -34,18 +34,43 @@ const NewsFeed = () => {
     });
   };
 
+  // Sort and filter news items
   const filteredNews = newsItems
-    ? newsItems.filter(
-        (item) =>
-          (searchTerm === "" || 
-           item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           item.content.toLowerCase().includes(searchTerm.toLowerCase())) &&
-          (filterSource === "all" || item.sourceType === filterSource)
-      )
+    ? newsItems
+        .filter(
+          (item) =>
+            (searchTerm === "" || 
+             item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             item.content.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            (filterSource === "all" || item.sourceType === filterSource)
+        )
+        // Sort by publishedAt date, newest first
+        // Handle future dates by putting them at the top
+        .sort((a, b) => {
+          const dateA = new Date(a.publishedAt);
+          const dateB = new Date(b.publishedAt);
+          const now = new Date();
+          
+          // If both dates are in the future, keep them in their original order
+          const aIsFuture = dateA > now;
+          const bIsFuture = dateB > now;
+          
+          if (aIsFuture && bIsFuture) {
+            return 0;
+          }
+          
+          // If only one date is in the future, prioritize it
+          if (aIsFuture) return -1;
+          if (bIsFuture) return 1;
+          
+          // Otherwise normal descending date sort
+          return dateB.getTime() - dateA.getTime();
+        })
     : [];
 
+  // Extract unique source types
   const sources = newsItems
-    ? [...new Set(newsItems.map((item) => item.sourceType))]
+    ? Array.from(new Set(newsItems.map((item) => item.sourceType)))
     : [];
 
   return (

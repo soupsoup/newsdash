@@ -18,6 +18,13 @@ const NewsCard = ({ news, onShare, onEdit }: NewsCardProps) => {
   const formatTimestamp = (timestamp: Date) => {
     const date = new Date(timestamp);
     const now = new Date();
+    
+    // Check if the date is in the future (more than 1 hour ahead)
+    // This can happen with incorrectly timestamped data
+    if (date.getTime() > now.getTime() + (60 * 60 * 1000)) {
+      return "Recently"; // Display generic text for future-dated items
+    }
+    
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
     if (diffInHours < 1) {
@@ -132,7 +139,7 @@ const NewsCard = ({ news, onShare, onEdit }: NewsCardProps) => {
           </div>
           
           <div className="flex space-x-1">
-            {news.sharedTo.includes("discord") ? (
+            {Array.isArray(news.sharedTo) && news.sharedTo.includes("discord") ? (
               <div className="w-6 h-6 rounded-full bg-[#2196f3] flex items-center justify-center text-white" title="Shared to Discord">
                 <span className="material-icons text-sm">discord</span>
               </div>
@@ -142,7 +149,7 @@ const NewsCard = ({ news, onShare, onEdit }: NewsCardProps) => {
               </div>
             )}
             
-            {news.sharedTo.includes("twitter") ? (
+            {Array.isArray(news.sharedTo) && news.sharedTo.includes("twitter") ? (
               <div className="w-6 h-6 rounded-full bg-[#2196f3] flex items-center justify-center text-white" title="Shared to Twitter">
                 <span className="material-icons text-sm">flutter_dash</span>
               </div>
@@ -152,7 +159,7 @@ const NewsCard = ({ news, onShare, onEdit }: NewsCardProps) => {
               </div>
             )}
             
-            {news.sharedTo.includes("wordpress") ? (
+            {Array.isArray(news.sharedTo) && news.sharedTo.includes("wordpress") ? (
               <div className="w-6 h-6 rounded-full bg-[#2196f3] flex items-center justify-center text-white" title="Shared to WordPress">
                 <span className="material-icons text-sm">wordpress</span>
               </div>
