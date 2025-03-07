@@ -1,6 +1,83 @@
-import puppeteer from 'puppeteer';
 import * as cheerio from 'cheerio';
+import fetch from 'node-fetch';
 import { InsertNewsItem } from '../../shared/schema';
+
+/**
+ * Try to get real Twitter data via publicly available APIs that don't require authentication
+ * This is a more reliable method than scraping when available
+ */
+async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
+  try {
+    console.log(`Attempting to fetch tweets for @${username} via API proxy`);
+    
+    // There are several public Twitter API proxies we can try
+    // These don't require API keys but may have rate limits or be unreliable
+    const proxyUrls = [
+      `https://api.fxtwitter.com/${username}`,
+      `https://api.vxtwitter.com/${username}`
+    ];
+    
+    for (const proxyUrl of proxyUrls) {
+      try {
+        console.log(`Trying Twitter API proxy: ${proxyUrl}`);
+        
+        const response = await fetch(proxyUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        });
+        
+        if (!response.ok) {
+          console.log(`Failed to fetch from proxy ${proxyUrl}: ${response.status}`);
+          continue;
+        }
+        
+        const data = await response.json() as any; // Type assertion for the unknown response format
+        
+        // Each proxy has a different response format, so we need to handle them separately
+        if (proxyUrl.includes('fxtwitter') || proxyUrl.includes('vxtwitter')) {
+          if (data.tweets && Array.isArray(data.tweets)) {
+            console.log(`Successfully fetched ${data.tweets.length} tweets from proxy ${proxyUrl}`);
+            
+            const tweets: ScrapedTweet[] = [];
+            
+            // fx/vxtwitter format
+            for (const tweet of data.tweets.slice(0, maxTweets)) {
+              // For DeItaone, only include tweets that start with *
+              if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
+                if (!tweet.text.startsWith('*')) continue;
+              }
+              
+              tweets.push({
+                id: tweet.id || `proxy-${Date.now()}-${tweets.length}`,
+                text: tweet.text,
+                created_at: tweet.created_at || new Date().toISOString(),
+                user: {
+                  id: tweet.author?.id || username,
+                  username: tweet.author?.screen_name || username,
+                  name: tweet.author?.name || (username === 'DeItaone' ? 'Delta One' : username),
+                  profile_image_url: tweet.author?.avatar_url || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                }
+              });
+            }
+            
+            if (tweets.length > 0) {
+              return tweets;
+            }
+          }
+        }
+      } catch (error) {
+        console.log(`Error fetching from proxy ${proxyUrl}:`, error);
+      }
+    }
+    
+    console.log('All API proxies failed');
+    return [];
+  } catch (error) {
+    console.error('Error in Twitter API proxy approach:', error);
+    return [];
+  }
+}
 
 interface ScrapedTweet {
   id: string;
@@ -15,114 +92,258 @@ interface ScrapedTweet {
 }
 
 /**
- * Scrapes tweets from a Twitter/X user profile page
+ * Scrapes tweets from a Twitter/X user profile page using direct HTTP request
+ * This is a simpler approach that doesn't require Puppeteer and works better in restricted environments
+ * 
  * @param username The Twitter/X username to scrape (without @)
  * @param maxTweets Maximum number of tweets to scrape
  * @returns An array of scraped tweets
  */
 export async function scrapeTweetsFromProfile(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
   try {
-    console.log(`Starting to scrape tweets from @${username}`);
+    console.log(`Starting to scrape tweets from @${username} using direct HTTP method`);
 
-    // Check if we're in a restricted environment
-    const isRestrictedEnvironment = process.env.REPL_ID || process.env.REPL_SLUG || process.env.REPLIT;
+    // First, let's try using Twitter API via public proxy
+    const tweets = await getRecentTweetsViaProxy(username, maxTweets);
     
-    if (isRestrictedEnvironment) {
-      console.log('Detected Replit environment - attempting real scraping first, with fallback if needed');
-      // We'll try to scrape but have a fallback ready
-    }
-
-    // Launch headless browser
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--disable-setuid-sandbox',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ]
-    });
-
-    try {
-      const page = await browser.newPage();
-      
-      // Set viewport and user agent to mimic a regular browser
-      await page.setViewport({ width: 1280, height: 800 });
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      
-      // Navigate to the user's profile page
-      const url = `https://x.com/${username}`;
-      console.log(`Navigating to ${url}`);
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // Wait for timeline to load
-      await page.waitForSelector('article', { timeout: 10000 })
-        .catch(e => console.log('Timeline selector not found, trying to continue anyway'));
-      
-      // Scroll a few times to load more tweets
-      for (let i = 0; i < 3; i++) {
-        await page.evaluate(() => window.scrollBy(0, 1000));
-        // Use standard setTimeout with a promise instead of waitForTimeout
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // Get page content and parse it with cheerio
-      const content = await page.content();
-      const $ = cheerio.load(content);
-      const tweets: ScrapedTweet[] = [];
-      
-      // Find all tweet articles
-      $('article').each((index, element) => {
-        if (tweets.length >= maxTweets) return;
-        
-        try {
-          // Try to extract the tweet ID from the article
-          const tweetLink = $(element).find('a[href*="/status/"]').attr('href');
-          if (!tweetLink) return;
-          
-          const tweetId = tweetLink.split('/status/')[1];
-          if (!tweetId) return;
-          
-          // Extract tweet text
-          let tweetText = '';
-          $(element).find('[data-testid="tweetText"]').each((i, el) => {
-            tweetText += $(el).text();
-          });
-          
-          // If no text found, skip this tweet
-          if (!tweetText) return;
-          
-          // Add to our collection
-          tweets.push({
-            id: tweetId,
-            text: tweetText,
-            created_at: new Date().toISOString(), // Use current time since exact time is hard to parse
-            user: {
-              id: username, // Use username as ID
-              username: username,
-              name: username === 'DeItaone' ? 'Delta One' : username,
-              profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
-            }
-          });
-        } catch (err) {
-          console.error('Error parsing tweet:', err);
-        }
-      });
-
-      console.log(`Successfully scraped ${tweets.length} tweets from @${username}`);
+    if (tweets.length > 0) {
+      console.log(`Successfully retrieved ${tweets.length} tweets via API proxy for @${username}`);
       return tweets;
-    } finally {
-      await browser.close();
-      console.log('Browser closed');
     }
+    
+    // If API proxy fails, try the Nitter approach
+    console.log(`API proxy failed, trying Nitter for @${username}`);
+    const nitterTweets = await scrapeFromNitter(username, maxTweets);
+    
+    if (nitterTweets.length > 0) {
+      console.log(`Successfully scraped ${nitterTweets.length} tweets from Nitter for @${username}`);
+      return nitterTweets;
+    }
+    
+    // If Nitter fails, try a direct X.com approach
+    console.log(`Nitter scraping failed, trying direct X.com request for @${username}`);
+    return await scrapeDirectFromX(username, maxTweets);
+    
   } catch (error) {
     console.error('Error scraping tweets:', error);
-    console.log('Scraping failed - no fallback data will be used as per requirements');
-    // As per requirements, we don't use fallback data
-    // Instead return an empty array and let the calling code handle the error appropriately
+    console.log('All scraping methods failed - no fallback data will be used as per requirements');
+    // Per requirements, we don't use mock/fallback data
+    return [];
+  }
+}
+
+/**
+ * Tries to scrape tweets from Nitter, an alternative Twitter frontend
+ */
+async function scrapeFromNitter(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
+  try {
+    // Try different Nitter instances as they might have different availability
+    const nitterInstances = [
+      'https://nitter.net',
+      'https://nitter.unixfox.eu',
+      'https://nitter.42l.fr',
+      'https://nitter.pussthecat.org'
+    ];
+    
+    // Try each instance until we get a successful response
+    for (const instance of nitterInstances) {
+      try {
+        const url = `${instance}/${username}`;
+        console.log(`Trying Nitter instance: ${url}`);
+        
+        // Set up AbortController with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        try {
+          // Attempt fetch with timeout via AbortController
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId); // Clear the timeout if the fetch is successful
+          
+          if (!response.ok) {
+            console.log(`Failed to fetch from ${url}: ${response.status} ${response.statusText}`);
+            continue;
+          }
+          
+          const html = await response.text();
+          console.log(`Successfully fetched from Nitter instance: ${instance}`);
+          
+          // Parse the Nitter HTML
+          const $ = cheerio.load(html);
+          const tweets: ScrapedTweet[] = [];
+          
+          // Nitter uses a different structure than Twitter/X
+          $('.timeline-item').each((index, element) => {
+            if (tweets.length >= maxTweets) return;
+            
+            try {
+              // Extract tweet ID
+              const tweetLink = $(element).find('.tweet-link').attr('href');
+              if (!tweetLink) return;
+              
+              const tweetIdMatch = tweetLink.match(/\/status\/(\d+)/);
+              if (!tweetIdMatch || !tweetIdMatch[1]) return;
+              
+              const tweetId = tweetIdMatch[1];
+              
+              // Extract tweet text
+              const tweetTextElement = $(element).find('.tweet-content');
+              if (!tweetTextElement.length) return;
+              
+              const tweetText = tweetTextElement.text().trim();
+              if (!tweetText) return;
+              
+              // For financial tweets like DeItaone, the text is often in uppercase
+              // This is especially useful for ensuring we capture the right content
+              const isFinancialTweet = username.toLowerCase() === 'deltaone' || 
+                                      username.toLowerCase() === 'deitaone';
+              
+              // Only include tweets that start with * for DeItaone as those are the financial alerts
+              if (isFinancialTweet && !tweetText.startsWith('*')) {
+                return;
+              }
+              
+              // Extract timestamp (Nitter shows relative time, so we approximate)
+              const timestampText = $(element).find('.tweet-date a').attr('title') || '';
+              const timestamp = timestampText ? new Date(timestampText).toISOString() : new Date().toISOString();
+              
+              // Extract user info
+              const userName = $(element).find('.fullname').text().trim() || 'Unknown';
+              
+              // Extract profile image URL
+              let profileImageUrl = $(element).find('.tweet-avatar img').attr('src') || '';
+              if (profileImageUrl && !profileImageUrl.startsWith('http')) {
+                profileImageUrl = `${instance}${profileImageUrl}`;
+              }
+              
+              // Create the tweet object
+              tweets.push({
+                id: tweetId,
+                text: tweetText,
+                created_at: timestamp,
+                user: {
+                  id: username,
+                  username: username,
+                  name: userName || (username === 'DeItaone' ? 'Delta One' : username),
+                  profile_image_url: profileImageUrl || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                }
+              });
+            } catch (err: any) {
+              console.error('Error parsing Nitter tweet:', err);
+            }
+          });
+          
+          if (tweets.length > 0) {
+            return tweets;
+          }
+          
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.log(`Request to ${url} timed out after 5 seconds`);
+          } else {
+            console.log(`Error fetching from ${url}:`, error.message);
+          }
+        }
+      } catch (err: any) {
+        console.log(`Failed to fetch from Nitter instance: ${instance}`, err.message);
+      }
+    }
+    
+    console.log('All Nitter instances failed');
+    return [];
+  } catch (error: any) {
+    console.error('Error in Nitter scraping:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Direct scraping from X.com using a simple fetch request
+ * This is less reliable than Puppeteer but works in more restricted environments
+ */
+async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
+  try {
+    const url = `https://x.com/${username}`;
+    console.log(`Fetching directly from: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`Failed to fetch from X.com: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const tweets: ScrapedTweet[] = [];
+    
+    // X.com/Twitter has a complex structure, especially with React/JS rendering
+    // This approach has limitations but might catch some content
+    $('article').each((index, element) => {
+      if (tweets.length >= maxTweets) return;
+      
+      try {
+        // Try to extract the tweet ID from the article
+        const tweetLink = $(element).find('a[href*="/status/"]').attr('href');
+        if (!tweetLink) return;
+        
+        const tweetId = tweetLink.split('/status/')[1];
+        if (!tweetId) return;
+        
+        // Extract tweet text - different selectors to try
+        let tweetText = '';
+        $(element).find('[data-testid="tweetText"]').each((i, el) => {
+          tweetText += $(el).text();
+        });
+        
+        // If no text with the testid, try other common elements
+        if (!tweetText) {
+          // Look for paragraphs that might contain the tweet text
+          $(element).find('p').each((i, el) => {
+            const potentialText = $(el).text().trim();
+            if (potentialText && potentialText.length > 5) {
+              tweetText = potentialText;
+            }
+          });
+        }
+        
+        // If still no text, skip this tweet
+        if (!tweetText) return;
+        
+        // Create unique ID based on the tweet ID
+        const uniqueId = `x-${tweetId}-${Date.now().toString().slice(-4)}`;
+        
+        // Add to our collection
+        tweets.push({
+          id: uniqueId,
+          text: tweetText,
+          created_at: new Date().toISOString(), // Use current time since exact time is hard to parse
+          user: {
+            id: username,
+            username: username,
+            name: username === 'DeItaone' ? 'Delta One' : username,
+            profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+          }
+        });
+      } catch (err) {
+        console.error('Error parsing X.com tweet:', err);
+      }
+    });
+    
+    console.log(`Extracted ${tweets.length} tweets directly from X.com for @${username}`);
+    return tweets;
+  } catch (error) {
+    console.error('Error in direct X.com scraping:', error);
     return [];
   }
 }
