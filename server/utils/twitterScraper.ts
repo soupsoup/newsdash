@@ -272,21 +272,24 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                     .replace(/<!\[CDATA\[(.*?)\]\]>/, '$1')
                     .trim();
                   
-                  // For DeItaone, only include tweets that start with * or contain financial keywords
+                  // Removed strict financial filtering to get more recent tweets as requested
+                  // Only perform minimal filtering to avoid spam
                   const isFinancialTweet = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
                   
                   if (isFinancialTweet) {
-                    // Check for financial tweet indicators (starts with * or has financial terms)
-                    const hasAsterisk = tweetText.startsWith('*');
-                    // Expanded financial terms detection to include more keywords and patterns
-                    const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) || 
-                      /\d+\.?\d*\s*%/i.test(tweetText) || // Contains percentages
-                      tweetText.toUpperCase() === tweetText; // All caps is often important financial news
+                    // Only skip obvious non-financial/promotional tweets
+                    const isObviouslyNonFinancial = 
+                      tweetText.includes('Follow us on') || 
+                      tweetText.includes('Subscribe to') ||
+                      tweetText.includes('Click here to');
                     
-                    if (!hasAsterisk && !hasFinancialTerms) {
-                      console.log(`Skipping non-financial tweet: ${tweetText.substring(0, 30)}...`);
+                    if (isObviouslyNonFinancial) {
+                      console.log(`Skipping promotional tweet: ${tweetText.substring(0, 30)}...`);
                       continue;
                     }
+                    
+                    // Log the tweet we're keeping
+                    console.log(`Keeping tweet: ${tweetText.substring(0, 30)}...`);
                   }
                   
                   // Extract publication date with better regex
@@ -449,7 +452,7 @@ interface ScrapedTweet {
  * @param maxTweets Maximum number of tweets to scrape
  * @returns An array of scraped tweets
  */
-export async function scrapeTweetsFromProfile(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
+export async function scrapeTweetsFromProfile(username: string, maxTweets = 25): Promise<ScrapedTweet[]> {
   try {
     console.log(`Starting to scrape tweets from @${username} using direct HTTP method`);
 
@@ -587,16 +590,18 @@ async function scrapeFromNitter(username: string, maxTweets = 10): Promise<Scrap
               const isFinancialTweet = username.toLowerCase() === 'deltaone' || 
                                       username.toLowerCase() === 'deitaone';
               
-              // For DeItaone, allow more tweets to be included with expanded criteria
+              // Removed strict filtering to show the most recent tweets
               if (isFinancialTweet) {
-                // Expanded financial terms detection
-                const isRelevant = 
-                  tweetText.startsWith('*') || 
-                  tweetText.toUpperCase() === tweetText || // All caps is often important
-                  /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
-                  /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+                // Only filter out obvious promotional tweets
+                const isObviouslyPromotional = 
+                  tweetText.includes('Follow us on') || 
+                  tweetText.includes('Subscribe to') ||
+                  tweetText.includes('Click here to');
                 
-                if (!isRelevant) return;
+                if (isObviouslyPromotional) return;
+                
+                // Log tweets we're keeping
+                console.log(`Keeping Nitter tweet: ${tweetText.substring(0, 30)}...`);
               }
               
               // Extract timestamp (Nitter shows relative time, so we approximate)
@@ -808,17 +813,19 @@ async function scrapeDirectFromX(username: string, maxTweets = 10): Promise<Scra
                 }
               }
               
-              // For DeItaone, check if this is a financial tweet
+              // For DeItaone, only perform minimal filtering
               const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
               if (isDeItaone) {
-                // Check if this is a financial tweet using our expanded criteria
-                const isFinancial = 
-                  tweetText.startsWith('*') || 
-                  tweetText.toUpperCase() === tweetText || // All caps is often important
-                  /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
-                  /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+                // Only skip obvious promotional tweets
+                const isObviouslyPromotional = 
+                  tweetText.includes('Follow us on') || 
+                  tweetText.includes('Subscribe to') ||
+                  tweetText.includes('Click here to');
                 
-                if (!isFinancial) return;
+                if (isObviouslyPromotional) return;
+                
+                // Log the tweet we're keeping
+                console.log(`Keeping direct X tweet: ${tweetText.substring(0, 30)}...`);
               }
               
               // Add to our collection
@@ -880,17 +887,19 @@ function searchForTweets(obj: any, username: string, maxTweets: number, tweets: 
       const tweetId = obj.id_str || obj.id;
       const createdAt = obj.created_at || obj.timestamp;
       
-      // For DeItaone, check if this is a financial tweet
+      // For DeItaone, only perform minimal filtering
       const isDeItaone = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
       if (isDeItaone) {
-        // Check if this is a financial tweet using our expanded criteria
-        const isFinancial = 
-          tweetText.startsWith('*') || 
-          tweetText.toUpperCase() === tweetText || // All caps is often important
-          /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
-          /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+        // Only skip obvious promotional tweets
+        const isObviouslyPromotional = 
+          tweetText.includes('Follow us on') || 
+          tweetText.includes('Subscribe to') ||
+          tweetText.includes('Click here to');
         
-        if (!isFinancial) return;
+        if (isObviouslyPromotional) return;
+        
+        // Log the tweet we're keeping
+        console.log(`Keeping JSON tweet: ${tweetText.substring(0, 30)}...`);
       }
       
       // Create a timestamp

@@ -13,7 +13,7 @@ import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems 
  * @param limit Maximum number of tweets to fetch
  * @returns Array of tweet objects
  */
-async function fetchTweetsFromUser(username: string, limit = 15): Promise<{
+async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
   tweets: any[],
   success: boolean,
   error?: string,
@@ -102,7 +102,7 @@ function startPeriodicTwitterSync(storage: IStorage) {
           
           // Fetch tweets using our scraper with increased limit for better detection of financial tweets
           console.log(`[Periodic Sync] Fetching tweets from ${username}`);
-          const result = await fetchTweetsFromUser(username, 15);
+          const result = await fetchTweetsFromUser(username, 25);
           
           // Check if we got any tweets
           if (!result.success || result.tweets.length === 0) {
@@ -191,7 +191,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           
           // Fetch tweets using our scraper with increased limit to better capture recent financial tweets
           console.log(`Fetching tweets from ${username}`);
-          const result = await fetchTweetsFromUser(username, 20);
+          const result = await fetchTweetsFromUser(username, 25);
           
           // Check if we got any tweets
           if (!result.success || result.tweets.length === 0) {
