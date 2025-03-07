@@ -968,6 +968,13 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
         console.log(`Invalid date format for tweet ${tweet.id}: "${tweet.created_at}". Using current time.`);
         publishedAt = new Date();
       }
+      
+      // Sanity check - if the date is far in the future (more than 1 day ahead), use current time
+      const now = new Date();
+      if (publishedAt.getTime() > now.getTime() + (24 * 60 * 60 * 1000)) {
+        console.log(`Tweet ${tweet.id} has future date: ${publishedAt.toISOString()}. Using current time instead.`);
+        publishedAt = now;
+      }
     } catch (error) {
       console.log(`Error parsing tweet date: ${error}. Using current time.`);
       publishedAt = new Date();
