@@ -10,7 +10,7 @@ const NewsFeed = () => {
   const { newsItems, isLoading, refetchNewsItems } = useNewsItems();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterSource, setFilterSource] = useState("");
+  const [filterSource, setFilterSource] = useState("all");
 
   const handleShareNews = (newsId: number) => {
     toast({
@@ -40,7 +40,7 @@ const NewsFeed = () => {
           (searchTerm === "" || 
            item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
            item.content.toLowerCase().includes(searchTerm.toLowerCase())) &&
-          (filterSource === "" || item.sourceType === filterSource)
+          (filterSource === "all" || item.sourceType === filterSource)
       )
     : [];
 
@@ -76,7 +76,7 @@ const NewsFeed = () => {
               <SelectValue placeholder="Filter by source" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Sources</SelectItem>
+              <SelectItem value="all">All Sources</SelectItem>
               {sources.map((source) => (
                 <SelectItem key={source} value={source}>
                   {source.charAt(0).toUpperCase() + source.slice(1)}

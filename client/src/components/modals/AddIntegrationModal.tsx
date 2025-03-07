@@ -17,7 +17,7 @@ const AddIntegrationModal = ({ isOpen, onClose }: AddIntegrationModalProps) => {
   const { addIntegration } = useIntegration();
   const { toast } = useToast();
 
-  const [integrationType, setIntegrationType] = useState("");
+  const [integrationType, setIntegrationType] = useState("discord");
   const [name, setName] = useState("");
   const [isSource, setIsSource] = useState(false);
   const [isDestination, setIsDestination] = useState(false);
@@ -74,7 +74,7 @@ const AddIntegrationModal = ({ isOpen, onClose }: AddIntegrationModalProps) => {
   };
 
   const resetForm = () => {
-    setIntegrationType("");
+    setIntegrationType("discord");
     setName("");
     setIsSource(false);
     setIsDestination(false);
