@@ -116,12 +116,23 @@ const DataSources = () => {
                 Possible reasons:
               </p>
               <ul className="text-xs list-disc ml-4 space-y-1 mb-2">
-                <li>Web scraping limitations in the current environment</li>
-                <li>Twitter's access restrictions for non-API access</li>
-                <li>Network connectivity issues</li>
+                <li>Twitter's security measures actively block scraping attempts</li>
+                <li>Replit environment has restricted network access to certain Twitter services</li>
+                <li>API Gateway proxies may be experiencing temporary downtime</li>
+                <li>Our system only works with actual tweets - mock data is not used</li>
               </ul>
-              <p className="text-xs">
-                Try clicking "Sync Now" to attempt to fetch data again.
+              <p className="text-xs mb-2">
+                Try clicking "Sync Now" to attempt to fetch data again. Our system uses multiple methods to try to retrieve real Twitter data:
+              </p>
+              <ul className="text-xs list-disc ml-4 space-y-1 mb-2">
+                <li>API Gateway proxies (fxtwitter, vxtwitter)</li>
+                <li>RSS feed scraping</li>
+                <li>Twitter Syndication API</li> 
+                <li>Multiple Nitter instances</li>
+                <li>Direct X.com scraping</li>
+              </ul>
+              <p className="text-xs text-blue-700 font-medium">
+                We continue to improve our scraping methods for better reliability.
               </p>
             </div>
           )}
@@ -207,15 +218,40 @@ const DataSources = () => {
                     }
                   } else {
                     // Extract any detailed error information from the response
-                    const errorDetails = data.error || (data.results && data.results.length > 0 ? data.results[0].error : null);
-                    const tips = data.tips || (data.results && data.results.length > 0 ? data.results[0].tips : null);
+                    const result = data.results && data.results.length > 0 ? data.results[0] : null;
+                    const errorDetails = data.error || (result?.error);
+                    const details = result?.details || null;
+                    const tips = data.tips || (result?.tips);
+                    const technical = result?.technical || null;
                     
+                    // Log technical information for debugging
+                    if (technical) {
+                      console.log("Technical details about scraping failure:", technical);
+                    }
+                    
+                    // Show expanded error information in toast
                     toast({
                       title: "Real-time Data Unavailable",
                       description: (
                         <div className="space-y-1">
-                          <p>{data.message || "Failed to retrieve real Twitter data. No mock data will be used."}</p>
+                          <p className="font-medium">{data.message || "Failed to retrieve real Twitter data. No mock data will be used."}</p>
+                          
+                          {/* Display primary error */}
                           {errorDetails && <p className="text-sm text-red-500">{errorDetails}</p>}
+                          
+                          {/* Show specific details if available */}
+                          {details && Array.isArray(details) && details.length > 0 && (
+                            <div className="pt-1">
+                              <p className="text-xs font-medium">Details:</p>
+                              <ul className="text-xs list-disc pl-4">
+                                {details.slice(0, 2).map((detail, i) => (
+                                  <li key={i}>{detail}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {/* Show suggestions for user */}
                           {tips && Array.isArray(tips) && tips.length > 0 && (
                             <div className="pt-1">
                               <p className="text-xs font-medium">Suggestions:</p>
@@ -225,6 +261,13 @@ const DataSources = () => {
                                 ))}
                               </ul>
                             </div>
+                          )}
+                          
+                          {/* Show timestamp if available */}
+                          {result?.timestamp && (
+                            <p className="text-xs text-gray-500 pt-1">
+                              Attempted at: {new Date(result.timestamp).toLocaleTimeString()}
+                            </p>
                           )}
                         </div>
                       ),

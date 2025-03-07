@@ -161,6 +161,8 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   // API endpoint to manually trigger a Twitter sync for DeItaone
   app.post("/api/integrations/twitter/sync", async (req, res) => {
     try {
+      console.log("Twitter sync manually triggered");
+      
       // Get active Twitter integrations
       const twitterIntegrations = await storage.getIntegrationsByType("twitter");
       const activeIntegrations = twitterIntegrations.filter(
@@ -170,7 +172,11 @@ export function setupTwitterService(app: Express, storage: IStorage) {
       if (activeIntegrations.length === 0) {
         return res.status(400).json({ 
           success: false,
-          message: "No active Twitter integrations found" 
+          message: "No active Twitter integrations found",
+          tips: [
+            "Go to Data Sources tab and make sure Twitter integration is active",
+            "Configure Twitter integration with username: DeItaone"
+          ]
         });
       }
 
@@ -254,6 +260,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           // Extract any detailed error info
           const errorDetails = (err as any).details || null;
           const errorTips = (err as any).tips || null;
+          const technicalInfo = (err as any).technical || null;
           
           syncResults.push({
             integrationId: integration.id,
@@ -265,7 +272,9 @@ export function setupTwitterService(app: Express, storage: IStorage) {
               'Twitter has strong anti-scraping measures',
               'Try again later or with a different username',
               'Consider using a real Twitter API key if available'
-            ]
+            ],
+            technical: technicalInfo,
+            timestamp: new Date().toISOString()
           });
         }
       }

@@ -3,78 +3,232 @@ import fetch from 'node-fetch';
 import { InsertNewsItem } from '../../shared/schema';
 
 /**
- * Try to get real Twitter data via publicly available APIs that don't require authentication
- * This is a more reliable method than scraping when available
+ * Attempt to get real Twitter data using a combination of techniques
+ * This is more reliable than a single method
  */
 async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promise<ScrapedTweet[]> {
   try {
-    console.log(`Attempting to fetch tweets for @${username} via API proxy`);
+    console.log(`Attempting to fetch tweets for @${username} via improved proxy methods`);
     
-    // There are several public Twitter API proxies we can try
-    // These don't require API keys but may have rate limits or be unreliable
-    const proxyUrls = [
-      `https://api.fxtwitter.com/${username}`,
-      `https://api.vxtwitter.com/${username}`
+    // New approach: Try multiple different proxy services that don't require authentication
+    // These are more likely to work in restricted environments like Replit
+    const proxyServices = [
+      // Public API gateways
+      {
+        url: `https://api.fxtwitter.com/${username}`,
+        type: 'fxtwitter'
+      },
+      {
+        url: `https://api.vxtwitter.com/${username}`,
+        type: 'vxtwitter'
+      },
+      // RSS-based services
+      {
+        url: `https://nitter.privacydev.net/${username}/rss`,
+        type: 'rss'
+      },
+      // Twitter public consumer API proxies
+      {
+        url: `https://syndication.twitter.com/srv/timeline-profile/screen-name/${username}`,
+        type: 'syndication',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Referer': 'https://publish.twitter.com/',
+          'Origin': 'https://publish.twitter.com'
+        }
+      }
     ];
     
-    for (const proxyUrl of proxyUrls) {
+    // Try each proxy service
+    for (const service of proxyServices) {
       try {
-        console.log(`Trying Twitter API proxy: ${proxyUrl}`);
+        console.log(`Trying Twitter service: ${service.type} via ${service.url}`);
         
-        const response = await fetch(proxyUrl, {
-          headers: {
+        const response = await fetch(service.url, {
+          headers: service.headers || {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
+          },
+          // Set a reasonable timeout
+          signal: AbortSignal.timeout(10000)
         });
         
         if (!response.ok) {
-          console.log(`Failed to fetch from proxy ${proxyUrl}: ${response.status}`);
+          console.log(`Failed to fetch from ${service.type}: ${response.status}`);
           continue;
         }
         
-        const data = await response.json() as any; // Type assertion for the unknown response format
-        
-        // Each proxy has a different response format, so we need to handle them separately
-        if (proxyUrl.includes('fxtwitter') || proxyUrl.includes('vxtwitter')) {
-          if (data.tweets && Array.isArray(data.tweets)) {
-            console.log(`Successfully fetched ${data.tweets.length} tweets from proxy ${proxyUrl}`);
+        // Handle different response formats based on service type
+        if (service.type === 'fxtwitter' || service.type === 'vxtwitter') {
+          try {
+            const data = await response.json() as any;
             
-            const tweets: ScrapedTweet[] = [];
-            
-            // fx/vxtwitter format
-            for (const tweet of data.tweets.slice(0, maxTweets)) {
-              // For DeItaone, only include tweets that start with *
-              if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
-                if (!tweet.text.startsWith('*')) continue;
+            if (data.tweets && Array.isArray(data.tweets)) {
+              console.log(`Successfully fetched ${data.tweets.length} tweets from ${service.type}`);
+              
+              const tweets: ScrapedTweet[] = [];
+              
+              // fx/vxtwitter format
+              for (const tweet of data.tweets.slice(0, maxTweets)) {
+                // For DeItaone, only include tweets that start with *
+                if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
+                  if (!tweet.text.startsWith('*')) continue;
+                }
+                
+                tweets.push({
+                  id: `${service.type}-${tweet.id || Date.now()}-${tweets.length}`,
+                  text: tweet.text,
+                  created_at: tweet.created_at || new Date().toISOString(),
+                  user: {
+                    id: tweet.author?.id || username,
+                    username: tweet.author?.screen_name || username,
+                    name: tweet.author?.name || (username === 'DeItaone' ? 'Delta One' : username),
+                    profile_image_url: tweet.author?.avatar_url || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                  }
+                });
               }
               
-              tweets.push({
-                id: tweet.id || `proxy-${Date.now()}-${tweets.length}`,
-                text: tweet.text,
-                created_at: tweet.created_at || new Date().toISOString(),
-                user: {
-                  id: tweet.author?.id || username,
-                  username: tweet.author?.screen_name || username,
-                  name: tweet.author?.name || (username === 'DeItaone' ? 'Delta One' : username),
-                  profile_image_url: tweet.author?.avatar_url || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+              if (tweets.length > 0) {
+                return tweets;
+              }
+            }
+          } catch (error) {
+            console.log(`Error parsing JSON from ${service.type}:`, error);
+          }
+        } else if (service.type === 'rss') {
+          try {
+            const text = await response.text();
+            
+            // Simple RSS parsing without requiring additional dependencies
+            const items = text.match(/<item>[\s\S]*?<\/item>/g) || [];
+            console.log(`Found ${items.length} RSS items for @${username}`);
+            
+            if (items.length > 0) {
+              const tweets: ScrapedTweet[] = [];
+              
+              for (const item of items.slice(0, maxTweets)) {
+                try {
+                  // Extract title (tweet text)
+                  const titleMatch = item.match(/<title>(.*?)<\/title>/);
+                  if (!titleMatch) continue;
+                  
+                  let tweetText = titleMatch[1];
+                  // Clean up any HTML entities
+                  tweetText = tweetText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                  
+                  // For DeItaone, only include tweets that start with *
+                  if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
+                    if (!tweetText.startsWith('*')) continue;
+                  }
+                  
+                  // Extract publication date
+                  const dateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
+                  const pubDate = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+                  
+                  // Extract link to get tweet ID
+                  const linkMatch = item.match(/<link>(.*?)<\/link>/);
+                  const link = linkMatch ? linkMatch[1] : '';
+                  const idMatch = link.match(/status\/(\d+)/);
+                  const tweetId = idMatch ? idMatch[1] : `rss-${Date.now()}-${tweets.length}`;
+                  
+                  tweets.push({
+                    id: tweetId,
+                    text: tweetText,
+                    created_at: pubDate,
+                    user: {
+                      id: username,
+                      username: username,
+                      name: username === 'DeItaone' ? 'Delta One' : username,
+                      profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                    }
+                  });
+                } catch (itemError) {
+                  console.log('Error parsing RSS item:', itemError);
                 }
-              });
+              }
+              
+              if (tweets.length > 0) {
+                return tweets;
+              }
+            }
+          } catch (error) {
+            console.log(`Error parsing RSS feed from ${service.url}:`, error);
+          }
+        } else if (service.type === 'syndication') {
+          try {
+            const text = await response.text();
+            
+            // The syndication API returns a JavaScript-like object wrapped in a function call
+            // We need to extract the JSON part
+            const jsonMatch = text.match(/\(\s*({[\s\S]*})\s*\)/);
+            if (!jsonMatch || !jsonMatch[1]) {
+              console.log('Could not extract JSON from syndication API');
+              continue;
             }
             
-            if (tweets.length > 0) {
-              return tweets;
+            try {
+              const data = JSON.parse(jsonMatch[1]);
+              if (data.body) {
+                const tweets: ScrapedTweet[] = [];
+                
+                // Find tweet elements
+                const $ = cheerio.load(data.body);
+                $('.timeline-Tweet').each((i, element) => {
+                  if (tweets.length >= maxTweets) return;
+                  
+                  try {
+                    const tweetText = $(element).find('.timeline-Tweet-text').text().trim();
+                    if (!tweetText) return;
+                    
+                    // For DeItaone, only include tweets that start with *
+                    if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
+                      if (!tweetText.startsWith('*')) return;
+                    }
+                    
+                    const tweetId = $(element).attr('data-tweet-id') || `syndication-${Date.now()}-${i}`;
+                    const timestamp = $(element).find('.timeline-Tweet-timestamp').attr('datetime') || new Date().toISOString();
+                    
+                    // Extract user info
+                    const userName = $(element).find('.timeline-Tweet-author .TweetAuthor-name').text().trim();
+                    const userScreenName = $(element).find('.timeline-Tweet-author .TweetAuthor-screenName').text().trim().replace('@', '');
+                    const profileImage = $(element).find('.timeline-Tweet-author .Avatar').attr('src') || '';
+                    
+                    tweets.push({
+                      id: tweetId,
+                      text: tweetText,
+                      created_at: timestamp,
+                      user: {
+                        id: userScreenName || username,
+                        username: userScreenName || username,
+                        name: userName || (username === 'DeItaone' ? 'Delta One' : username),
+                        profile_image_url: profileImage || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                      }
+                    });
+                  } catch (tweetError) {
+                    console.log('Error parsing tweet from syndication API:', tweetError);
+                  }
+                });
+                
+                if (tweets.length > 0) {
+                  return tweets;
+                }
+              }
+            } catch (jsonError) {
+              console.log('Error parsing JSON from syndication API:', jsonError);
             }
+          } catch (error) {
+            console.log(`Error processing syndication API response:`, error);
           }
         }
       } catch (error) {
-        console.log(`Error fetching from proxy ${proxyUrl}:`, error);
+        console.log(`Error fetching from ${service.type}:`, error);
       }
     }
     
-    console.log('All API proxies failed');
+    console.log('All proxy methods failed');
     return [];
   } catch (error) {
-    console.error('Error in Twitter API proxy approach:', error);
+    console.error('Error in improved Twitter proxy approach:', error);
     return [];
   }
 }
@@ -128,18 +282,37 @@ export async function scrapeTweetsFromProfile(username: string, maxTweets = 10):
     console.error('Error scraping tweets:', error);
     console.log('All scraping methods failed - no fallback data will be used as per requirements');
     
-    // Create meaningful error that can be propagated up
+    // Create meaningful error that can be propagated up with detailed information
     const err = new Error('Failed to retrieve Twitter data');
+    
+    // Provide specific details about the issue
     (err as any).details = [
+      'Unable to retrieve real Twitter data through any of our scraping methods',
       'Twitter has anti-scraping measures that block automated access',
-      'Replit environment may have restricted network access to Twitter services',
-      'All scraping methods have been attempted and failed'
+      'Replit environment may have network limitations for certain external services',
+      'This is a common issue with web scraping and not a problem with your setup'
     ];
+    
+    // Give actionable tips that might help resolve the issue
     (err as any).tips = [
-      'Try again in a few minutes',
-      'DeItaone financial tweets are the primary target for this application',
-      'Twitter scraping is inherently unreliable without official API access'
+      'Try again in a few minutes - Twitter rate limits may resolve',
+      'Our system is specifically designed to work with @DeItaone financial tweets',
+      'We continue to improve our scraping methods for better reliability',
+      'Per requirements, we never use mock/fake data - only display real tweets or errors'
     ];
+    
+    // Include technical details that might help debugging
+    (err as any).technical = {
+      methodsAttempted: [
+        'Twitter API Gateway proxies (fxtwitter, vxtwitter)',
+        'RSS feed scraping (nitter.privacydev.net/rss)',
+        'Twitter Syndication API (syndication.twitter.com)',
+        'Nitter instances',
+        'Direct X.com scraping'
+      ],
+      timestamp: new Date().toISOString(),
+      username: username
+    };
     
     // Per requirements, we don't use mock/fallback data
     throw err;
