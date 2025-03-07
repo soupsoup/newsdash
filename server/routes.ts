@@ -7,6 +7,7 @@ import { insertIntegrationSchema } from "@shared/schema";
 import { setupDiscordService } from "./services/discord";
 import { setupTwitterService } from "./services/twitter";
 import { setupWordPressService } from "./services/wordpress";
+import { scrapeTweetsFromProfile, tweetsToNewsItems } from "./utils/twitterScraper";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -202,6 +203,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete integration" });
+    }
+  });
+
+  // Test route for Twitter scraper (for development purposes)
+  app.get("/api/test/twitter-scraper", async (req, res) => {
+    try {
+      const username = req.query.username as string || "DeItaone";
+      const limit = parseInt(req.query.limit as string || "5");
+      
+      console.log(`Testing Twitter scraper for @${username} with limit ${limit}`);
+      
+      // Attempt to scrape tweets
+      const tweets = await scrapeTweetsFromProfile(username, limit);
+      
+      // Convert to news items format
+      const newsItems = tweetsToNewsItems(tweets, `X/Twitter: @${username}`);
+      
+      res.json({
+        success: true,
+        tweets: tweets,
+        newsItems: newsItems,
+        count: tweets.length
+      });
+    } catch (error) {
+      console.error("Error testing Twitter scraper:", error);
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message
+      });
     }
   });
 
