@@ -65,14 +65,9 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
     try {
       // Call Twitter share API
       const response = await apiRequest(
+        "POST",
         "/api/integrations/twitter/share",
-        {
-          method: "POST",
-          body: JSON.stringify({ newsId: newsItem.id, message }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { newsId: newsItem.id, message }
       );
 
       toast({
@@ -85,6 +80,7 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
       
       handleClose();
     } catch (error) {
+      console.error("Twitter share error:", error);
       toast({
         title: "Error",
         description: "Failed to share to Twitter. Please try again.",

@@ -60,19 +60,14 @@ const ShareToWordPressModal = ({ newsItem, isOpen, onClose }: ShareToWordPressMo
     try {
       // Call WordPress share API
       const response = await apiRequest(
+        "POST",
         "/api/integrations/wordpress/share",
-        {
-          method: "POST",
-          body: JSON.stringify({ 
-            newsId: newsItem.id, 
-            title,
-            content,
-            category,
-            status
-          }),
-          headers: {
-            "Content-Type": "application/json",
-          },
+        { 
+          newsId: newsItem.id, 
+          title,
+          content,
+          category,
+          status
         }
       );
 

@@ -44,14 +44,9 @@ const ShareToDiscordModal = ({ newsItem, isOpen, onClose }: ShareToDiscordModalP
     try {
       // Call Discord share API
       const response = await apiRequest(
+        "POST",
         "/api/integrations/discord/share",
-        {
-          method: "POST",
-          body: JSON.stringify({ newsId: newsItem.id, message }),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { newsId: newsItem.id, message }
       );
 
       toast({
@@ -64,6 +59,7 @@ const ShareToDiscordModal = ({ newsItem, isOpen, onClose }: ShareToDiscordModalP
       
       handleClose();
     } catch (error) {
+      console.error("Discord share error:", error);
       toast({
         title: "Error",
         description: "Failed to share to Discord. Please try again.",

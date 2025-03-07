@@ -243,11 +243,102 @@ export function setupDiscordService(app: Express, storage: IStorage) {
         return res.status(400).json({ message: "No active Discord integrations found" });
       }
 
-      // In a real implementation, we would use the Discord API to send messages
-      // For now, simulate successful sharing
-
       // Create the formatted message
       const content = message || `📰 **${newsItem.title}**\n\n${newsItem.content}`;
+      
+      console.log("Attempting to share to Discord:", { newsId, message: content });
+      
+      const shareResults = [];
+      let shareSuccess = false;
+
+      // Try to share to each active integration
+      for (const integration of activeIntegrations) {
+        try {
+          if (integration.webhookUrl) {
+            console.log(`Sending to Discord webhook for integration ${integration.id}`);
+            
+            // Prepare webhook payload
+            const webhookPayload = {
+              content,
+              username: "Financial News Bot",
+              avatar_url: "https://i.imgur.com/A1jAGlT.png" // Default avatar for financial news
+            };
+            
+            // Send message using the webhook URL
+            const webhookResponse = await fetch(integration.webhookUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(webhookPayload)
+            });
+            
+            if (!webhookResponse.ok) {
+              const errorText = await webhookResponse.text();
+              throw new Error(`Discord webhook error: ${webhookResponse.status} - ${errorText || webhookResponse.statusText}`);
+            }
+            
+            shareResults.push({
+              integrationId: integration.id,
+              name: integration.name,
+              success: true
+            });
+            
+            shareSuccess = true;
+          } else if (DISCORD_BOT_TOKEN) {
+            // Alternatively use bot token if webhook isn't available
+            console.log(`Sending to Discord API for integration ${integration.id}`);
+            
+            // Get channel ID from integration config
+            const config = integration.additionalConfig as Record<string, unknown> || {};
+            const channelId = config.channelId as string;
+            
+            if (!channelId) {
+              throw new Error("Channel ID is missing in integration configuration");
+            }
+            
+            // Send message using the bot token and channel ID
+            const apiResponse = await fetch(`${DISCORD_API_URL}/channels/${channelId}/messages`, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ content })
+            });
+            
+            if (!apiResponse.ok) {
+              const errorData = await apiResponse.json() as { message?: string };
+              throw new Error(`Discord API error: ${errorData.message || apiResponse.statusText}`);
+            }
+            
+            shareResults.push({
+              integrationId: integration.id,
+              name: integration.name,
+              success: true
+            });
+            
+            shareSuccess = true;
+          } else {
+            throw new Error("No webhook URL or bot token available for sending messages");
+          }
+        } catch (err) {
+          console.error(`Discord share error for integration ${integration.id}:`, err);
+          shareResults.push({
+            integrationId: integration.id,
+            name: integration.name,
+            success: false,
+            error: (err as Error).message
+          });
+        }
+      }
+      
+      if (!shareSuccess) {
+        return res.status(500).json({ 
+          message: "Failed to share to any Discord destinations", 
+          results: shareResults 
+        });
+      }
 
       // Update the shared platforms for the news item
       const currentSharedTo = newsItem.sharedTo || [];
@@ -259,12 +350,16 @@ export function setupDiscordService(app: Express, storage: IStorage) {
 
       res.json({
         message: "News shared to Discord successfully",
+        results: shareResults,
         platforms: ["discord"],
         newsItem,
       });
     } catch (error) {
       console.error("Discord share error:", error);
-      res.status(500).json({ message: "Discord share processing error" });
+      res.status(500).json({ 
+        message: "Discord share processing error",
+        error: (error as Error).message 
+      });
     }
   });
 
