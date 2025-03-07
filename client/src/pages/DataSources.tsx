@@ -134,12 +134,58 @@ const DataSources = () => {
           </div>
         </CardContent>
         <CardFooter className="justify-end">
-          <Button 
-            className="bg-[#1976d2] text-white hover:bg-[#1565c0]"
-            onClick={handleSaveConfig}
-          >
-            Save Configuration
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/integrations/discord/sync', {
+                    method: 'POST',
+                  });
+                  const data = await response.json();
+                  
+                  if (response.ok && data.results && data.results.length > 0) {
+                    const result = data.results[0];
+                    if (result.success) {
+                      toast({
+                        title: "Sync Successful",
+                        description: `Fetched ${result.totalFetched} messages, added ${result.itemsCreated} new items`,
+                      });
+                    } else {
+                      toast({
+                        title: "Sync Failed",
+                        description: result.error || "Unknown error occurred",
+                        variant: "destructive",
+                      });
+                    }
+                  } else {
+                    toast({
+                      title: "Sync Failed",
+                      description: "Failed to sync with Discord server",
+                      variant: "destructive",
+                    });
+                  }
+                  
+                  // Refresh the integrations data
+                  refreshIntegrations();
+                } catch (error) {
+                  toast({
+                    title: "Sync Error",
+                    description: "An error occurred while syncing with Discord",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              Sync Now
+            </Button>
+            <Button 
+              className="bg-[#1976d2] text-white hover:bg-[#1565c0]"
+              onClick={handleSaveConfig}
+            >
+              Save Configuration
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     );

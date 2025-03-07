@@ -7,20 +7,7 @@ import fetch from "node-fetch";
 const DISCORD_API_URL = "https://discord.com/api/v10";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
-export function setupDiscordService(app: Express, storage: IStorage) {
-  // Set up webhook for Discord events (not used here directly)
-  app.post("/api/webhooks/discord", async (req, res) => {
-    try {
-      // This would normally handle incoming Discord events
-      // For now, we'll just acknowledge the request
-      res.status(200).json({ message: "Webhook received" });
-    } catch (error) {
-      console.error("Discord webhook error:", error);
-      res.status(500).json({ message: "Discord webhook processing error" });
-    }
-  });
-
-  // Define Discord message type
+// Define Discord message type
 interface DiscordMessage {
   id: string;
   content: string;
@@ -68,21 +55,37 @@ function discordMessagesToNewsItems(messages: DiscordMessage[], sourceName: stri
       const content = msg.content;
       const title = content.split('\n')[0].slice(0, 100); // First line as title, max 100 chars
       
+      // Format metadata as a valid Record<string, any>
+      const metadata: Record<string, any> = {
+        authorId: msg.author.id,
+        authorUsername: msg.author.username,
+        channelId: msg.channel_id,
+        timestamp: msg.timestamp,
+      };
+      
       return {
         title: title || "Discord message",
         content: content,
         source: `Discord: ${sourceName}`,
         sourceType: "discord",
         externalId: msg.id,
-        metadata: {
-          authorId: msg.author.id,
-          authorUsername: msg.author.username,
-          channelId: msg.channel_id,
-          timestamp: msg.timestamp,
-        },
+        metadata,
       };
     });
 }
+
+export function setupDiscordService(app: Express, storage: IStorage) {
+  // Set up webhook for Discord events (not used here directly)
+  app.post("/api/webhooks/discord", async (req, res) => {
+    try {
+      // This would normally handle incoming Discord events
+      // For now, we'll just acknowledge the request
+      res.status(200).json({ message: "Webhook received" });
+    } catch (error) {
+      console.error("Discord webhook error:", error);
+      res.status(500).json({ message: "Discord webhook processing error" });
+    }
+  });
 
 // API endpoint to manually trigger a Discord sync
   app.post("/api/integrations/discord/sync", async (req, res) => {
@@ -103,7 +106,8 @@ function discordMessagesToNewsItems(messages: DiscordMessage[], sourceName: stri
       for (const integration of activeIntegrations) {
         try {
           // Extract configuration
-          const channelId = integration.additionalConfig?.channelId || "708365137660215330";
+          const config = integration.additionalConfig as Record<string, unknown> || {};
+          const channelId = (config.channelId as string) || "708365137660215330";
           
           // Fetch messages from Discord using our helper function
           console.log(`Fetching messages from Discord channel ${channelId}`);
@@ -261,19 +265,43 @@ function startPeriodicSync(storage: IStorage) {
       // Process each active Discord integration
       for (const integration of activeIntegrations) {
         try {
-          // In a real implementation, we would fetch new messages since lastSyncAt
-          // For now, we'll just update the lastSyncAt time
+          // Extract configuration (with fallback to your provided channel)
+          const config = integration.additionalConfig as Record<string, unknown> || {};
+          const channelId = (config.channelId as string) || "708365137660215330";
+          
+          // Fetch messages from Discord
+          console.log(`[Periodic Sync] Fetching messages from Discord channel ${channelId}`);
+          const messages = await fetchDiscordMessages(channelId, 5);
+          console.log(`[Periodic Sync] Fetched ${messages.length} messages from Discord`);
+          
+          // Convert Discord messages to news items
+          const newsItems = discordMessagesToNewsItems(messages, integration.name);
+          
+          // Store new items
+          let itemsCreated = 0;
+          for (const item of newsItems) {
+            // Check if we already have this message by externalId
+            const existingItems = (await storage.getAllNewsItems())
+              .filter(n => n.externalId === item.externalId);
+            
+            if (existingItems.length === 0) {
+              await storage.createNewsItem(item);
+              itemsCreated++;
+            }
+          }
+
+          // Update the integration's lastSyncAt time
           await storage.updateIntegration(integration.id, {
             lastSyncAt: new Date(),
           });
 
-          console.log(`Completed Discord sync for integration ${integration.id}`);
+          console.log(`[Periodic Sync] Completed Discord sync for integration ${integration.id}, created ${itemsCreated} new items`);
         } catch (err) {
-          console.error(`Discord sync error for integration ${integration.id}:`, err);
+          console.error(`[Periodic Sync] Discord sync error for integration ${integration.id}:`, err);
         }
       }
     } catch (error) {
-      console.error("Periodic Discord sync error:", error);
+      console.error("[Periodic Sync] Periodic Discord sync error:", error);
     }
   }, SYNC_INTERVAL);
 }
