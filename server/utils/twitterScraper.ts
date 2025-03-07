@@ -99,7 +99,10 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                           if (isFinancialTweet) {
                             // Check for financial tweet indicators
                             const hasAsterisk = tweetText.startsWith('*');
-                            const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                            // Expanded financial terms detection to include more keywords and patterns
+                            const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) || 
+                              /\d+\.?\d*\s*%/i.test(tweetText) || // Contains percentages
+                              tweetText.toUpperCase() === tweetText; // All caps is often important financial news
                             
                             if (!hasAsterisk && !hasFinancialTerms) {
                               continue;
@@ -142,7 +145,10 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                     
                     if (isFinancialTweet) {
                       const hasAsterisk = tweetText.startsWith('*');
-                      const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                      // Expanded financial terms detection to include more keywords and patterns
+                      const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) || 
+                        /\d+\.?\d*\s*%/i.test(tweetText) || // Contains percentages
+                        tweetText.toUpperCase() === tweetText; // All caps is often important financial news
                       
                       if (!hasAsterisk && !hasFinancialTerms) {
                         continue;
@@ -193,9 +199,16 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
               
               // fx/vxtwitter format
               for (const tweet of data.tweets.slice(0, maxTweets)) {
-                // For DeItaone, only include tweets that start with *
+                // For DeItaone, allow more tweets to be included with expanded criteria
                 if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
-                  if (!tweet.text.startsWith('*')) continue;
+                  // Expanded financial terms detection
+                  const isRelevant = 
+                    tweet.text.startsWith('*') || 
+                    tweet.text.toUpperCase() === tweet.text || // All caps is often important
+                    /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweet.text) ||
+                    /\d+\.?\d*\s*%/i.test(tweet.text); // Contains percentages
+                    
+                  if (!isRelevant) continue;
                 }
                 
                 tweets.push({
@@ -261,7 +274,10 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                   if (isFinancialTweet) {
                     // Check for financial tweet indicators (starts with * or has financial terms)
                     const hasAsterisk = tweetText.startsWith('*');
-                    const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                    // Expanded financial terms detection to include more keywords and patterns
+                    const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) || 
+                      /\d+\.?\d*\s*%/i.test(tweetText) || // Contains percentages
+                      tweetText.toUpperCase() === tweetText; // All caps is often important financial news
                     
                     if (!hasAsterisk && !hasFinancialTerms) {
                       console.log(`Skipping non-financial tweet: ${tweetText.substring(0, 30)}...`);
@@ -349,9 +365,16 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                     const tweetText = $(element).find('.timeline-Tweet-text').text().trim();
                     if (!tweetText) return;
                     
-                    // For DeItaone, only include tweets that start with *
+                    // For DeItaone, allow more tweets to be included with expanded criteria
                     if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
-                      if (!tweetText.startsWith('*')) return;
+                      // Expanded financial terms detection
+                      const isRelevant = 
+                        tweetText.startsWith('*') || 
+                        tweetText.toUpperCase() === tweetText || // All caps is often important
+                        /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
+                        /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+                      
+                      if (!isRelevant) return;
                     }
                     
                     const tweetId = $(element).attr('data-tweet-id') || `syndication-${Date.now()}-${i}`;
@@ -560,9 +583,16 @@ async function scrapeFromNitter(username: string, maxTweets = 10): Promise<Scrap
               const isFinancialTweet = username.toLowerCase() === 'deltaone' || 
                                       username.toLowerCase() === 'deitaone';
               
-              // Only include tweets that start with * for DeItaone as those are the financial alerts
-              if (isFinancialTweet && !tweetText.startsWith('*')) {
-                return;
+              // For DeItaone, allow more tweets to be included with expanded criteria
+              if (isFinancialTweet) {
+                // Expanded financial terms detection
+                const isRelevant = 
+                  tweetText.startsWith('*') || 
+                  tweetText.toUpperCase() === tweetText || // All caps is often important
+                  /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|DIMON|POWELL|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY|BANK|DOLLAR|EURO|YEN|GOLD|OIL|TREASURY|YIELD|BOND|DEBT|DEFICIT|SURPLUS|GROWTH|JOBS|EMPLOYMENT|RECESSION|INTEREST|CHAIRMAN|PRESIDENT|MINISTER|STATEMENT|PRESS|RELEASE|QUARTER|EARNINGS|PROFIT|REVENUE|PRICE|INCREASE|DECREASE|INDEX|RAISES?|CUTS?|RALLY|CRASH|SURGE|PLUMMET|DROP|RISES?|FALLS?|REPORT|DATA|FUND|INVEST|BULL|BEAR|VOLATILITY|FORECAST)\b/i.test(tweetText) ||
+                  /\d+\.?\d*\s*%/i.test(tweetText); // Contains percentages
+                
+                if (!isRelevant) return;
               }
               
               // Extract timestamp (Nitter shows relative time, so we approximate)
