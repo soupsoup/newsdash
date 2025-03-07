@@ -5,18 +5,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import NewsCard from "@/components/NewsCard";
 import { useNewsItems } from "@/hooks/useNewsItems";
 import { useToast } from "@/hooks/use-toast";
+import ShareToDiscordModal from "@/components/modals/ShareToDiscordModal";
+import ShareToTwitterModal from "@/components/modals/ShareToTwitterModal";
+import ShareToWordPressModal from "@/components/modals/ShareToWordPressModal";
+import { 
+  DropdownMenu,
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { NewsItem } from "@shared/schema";
 
 const NewsFeed = () => {
   const { newsItems, isLoading, refetchNewsItems } = useNewsItems();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSource, setFilterSource] = useState("all");
+  
+  // State for sharing modals
+  const [selectedNewsItem, setSelectedNewsItem] = useState<NewsItem | null>(null);
+  const [isDiscordModalOpen, setIsDiscordModalOpen] = useState(false);
+  const [isTwitterModalOpen, setIsTwitterModalOpen] = useState(false);
+  const [isWordPressModalOpen, setIsWordPressModalOpen] = useState(false);
 
   const handleShareNews = (newsId: number) => {
-    toast({
-      title: "Sharing News",
-      description: `Preparing to share news item #${newsId}`,
-    });
+    // Find the news item
+    const newsItem = newsItems?.find(item => item.id === newsId);
+    if (newsItem) {
+      setSelectedNewsItem(newsItem);
+      // Open sharing options menu with platform choices
+      document.getElementById(`share-dropdown-${newsId}`)?.click();
+    } else {
+      toast({
+        title: "Error",
+        description: "News item not found",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditNews = (newsId: number) => {
@@ -130,12 +155,57 @@ const NewsFeed = () => {
       ) : filteredNews.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredNews.map((news) => (
-            <NewsCard 
-              key={news.id} 
-              news={news} 
-              onShare={handleShareNews}
-              onEdit={handleEditNews}
-            />
+            <div key={news.id} className="relative">
+              <NewsCard 
+                news={news} 
+                onShare={handleShareNews}
+                onEdit={handleEditNews}
+              />
+              
+              {/* Hidden dropdown trigger for share platforms */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    id={`share-dropdown-${news.id}`} 
+                    className="hidden"
+                  >
+                    Share
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  <DropdownMenuItem 
+                    className="flex items-center cursor-pointer"
+                    onClick={() => {
+                      setSelectedNewsItem(news);
+                      setIsDiscordModalOpen(true);
+                    }}
+                  >
+                    <span className="material-icons text-[#5865F2] mr-2">discord</span> 
+                    <span>Share to Discord</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="flex items-center cursor-pointer"
+                    onClick={() => {
+                      setSelectedNewsItem(news);
+                      setIsTwitterModalOpen(true);
+                    }}
+                  >
+                    <span className="material-icons text-[#1DA1F2] mr-2">flutter_dash</span> 
+                    <span>Share to Twitter/X</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="flex items-center cursor-pointer"
+                    onClick={() => {
+                      setSelectedNewsItem(news);
+                      setIsWordPressModalOpen(true);
+                    }}
+                  >
+                    <span className="material-icons text-[#21759b] mr-2">wordpress</span> 
+                    <span>Share to WordPress</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ))}
         </div>
       ) : (
@@ -149,6 +219,25 @@ const NewsFeed = () => {
           </p>
         </div>
       )}
+
+      {/* Share Modals */}
+      <ShareToDiscordModal 
+        isOpen={isDiscordModalOpen}
+        onClose={() => setIsDiscordModalOpen(false)}
+        newsItem={selectedNewsItem}
+      />
+      
+      <ShareToTwitterModal
+        isOpen={isTwitterModalOpen}
+        onClose={() => setIsTwitterModalOpen(false)}
+        newsItem={selectedNewsItem}
+      />
+      
+      <ShareToWordPressModal
+        isOpen={isWordPressModalOpen} 
+        onClose={() => setIsWordPressModalOpen(false)}
+        newsItem={selectedNewsItem}
+      />
     </div>
   );
 };
