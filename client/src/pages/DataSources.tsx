@@ -195,7 +195,7 @@ const DataSources = () => {
                       if (result.success) {
                         toast({
                           title: "Sync Successful",
-                          description: `Fetched ${result.totalFetched} tweets, added ${result.itemsCreated} new items`,
+                          description: `Fetched ${result.totalFetched} tweets via ${result.method || 'scraping'}, added ${result.itemsCreated} new items`,
                         });
                       } else {
                         toast({
@@ -206,9 +206,28 @@ const DataSources = () => {
                       }
                     }
                   } else {
+                    // Extract any detailed error information from the response
+                    const errorDetails = data.error || (data.results && data.results.length > 0 ? data.results[0].error : null);
+                    const tips = data.tips || (data.results && data.results.length > 0 ? data.results[0].tips : null);
+                    
                     toast({
                       title: "Real-time Data Unavailable",
-                      description: data.message || "Failed to retrieve real Twitter data. No mock data will be used.",
+                      description: (
+                        <div className="space-y-1">
+                          <p>{data.message || "Failed to retrieve real Twitter data. No mock data will be used."}</p>
+                          {errorDetails && <p className="text-sm text-red-500">{errorDetails}</p>}
+                          {tips && Array.isArray(tips) && tips.length > 0 && (
+                            <div className="pt-1">
+                              <p className="text-xs font-medium">Suggestions:</p>
+                              <ul className="text-xs list-disc pl-4">
+                                {tips.map((tip, i) => (
+                                  <li key={i}>{tip}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ),
                       variant: "destructive",
                     });
                   }
