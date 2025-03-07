@@ -37,6 +37,162 @@ const DataSources = () => {
     }
   };
 
+  const TwitterSourceConfig = () => {
+    const twitterSource = sources.find(s => s.type === "twitter" && s.isSource);
+    const [username, setUsername] = useState(
+      (twitterSource?.additionalConfig as Record<string, any>)?.username || "DeItaone"
+    );
+    const [accountId, setAccountId] = useState(
+      (twitterSource?.additionalConfig as Record<string, any>)?.accountId || "1156910898"
+    );
+    
+    const handleSaveConfig = async () => {
+      if (!twitterSource) {
+        toast({
+          title: "Error",
+          description: "Twitter integration not found",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      try {
+        const updatedIntegration = {
+          ...twitterSource,
+          additionalConfig: {
+            ...((twitterSource.additionalConfig || {}) as Record<string, any>),
+            username,
+            accountId,
+          },
+          lastSyncAt: new Date(),
+        };
+        
+        await updateIntegration(updatedIntegration);
+        
+        toast({
+          title: "Twitter Configuration Saved",
+          description: "Successfully updated Twitter source configuration",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to save Twitter configuration",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className="mr-2" fill="currentColor">
+              <path d="M21.3 3.02h-3.61c.5.37.95.79 1.35 1.26.53.66.71 1.66.18 2.32-.93 1.17-2.72 1.41-3.93 1.02-.67-.24-1.13-.69-1.55-1.25-.47-.61-.56-1.32-.51-2.11h-2.49c.05.8-.04 1.5-.51 2.11-.41.57-.88 1.01-1.55 1.25-1.21.38-3 .15-3.93-1.02-.53-.66-.35-1.66.18-2.32.4-.47.85-.89 1.35-1.26H2.7c-.45 0-.9.37-.9.82v15.84c0 .45.45.82.9.82h18.6c.45 0 .9-.37.9-.82V3.84c0-.45-.45-.82-.9-.82z"/>
+            </svg>
+            Twitter/X Source Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 mb-4 border-l-4 border-amber-500 bg-amber-50 text-amber-800">
+            <h4 className="text-sm font-bold mb-2">Twitter/X Configuration</h4>
+            <p className="text-xs mb-2">
+              This integration uses web scraping to fetch tweets from Twitter/X since their API has limitations.
+            </p>
+            <ol className="text-xs list-decimal ml-4 space-y-1 mb-2">
+              <li>Enter the Twitter/X username you want to follow (without @)</li>
+              <li>Save the configuration and click "Sync Now" to fetch tweets</li>
+              <li>The default source is @DeItaone, which posts financial market news</li>
+              <li>Our system is optimized to work best with @DeItaone tweets</li>
+            </ol>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="username">Twitter/X Username</Label>
+            <Input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter Twitter username (without @)"
+            />
+            <p className="text-xs text-[#757575]">
+              Example: DeItaone
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="twitter-active">Active</Label>
+              <Switch
+                id="twitter-active"
+                checked={twitterSource?.status === "connected"}
+                onCheckedChange={(checked) => twitterSource && handleToggleSource(twitterSource, checked)}
+              />
+            </div>
+            <p className="text-xs text-[#757575]">
+              {twitterSource?.status === "connected" 
+                ? "Currently fetching tweets from Twitter/X" 
+                : "Source is currently inactive"}
+            </p>
+          </div>
+        </CardContent>
+        <CardFooter className="justify-end">
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/integrations/twitter/sync', {
+                    method: 'POST',
+                  });
+                  const data = await response.json();
+                  
+                  if (response.ok && data.results && data.results.length > 0) {
+                    const result = data.results[0];
+                    if (result.success) {
+                      toast({
+                        title: "Sync Successful",
+                        description: `Fetched ${result.totalFetched} tweets, added ${result.itemsCreated} new items`,
+                      });
+                    } else {
+                      toast({
+                        title: "Sync Failed",
+                        description: result.error || "Unknown error occurred",
+                        variant: "destructive",
+                      });
+                    }
+                  } else {
+                    toast({
+                      title: "Sync Failed",
+                      description: "Failed to sync with Twitter/X",
+                      variant: "destructive",
+                    });
+                  }
+                  
+                  // Refresh the integrations data
+                  refreshIntegrations();
+                } catch (error) {
+                  toast({
+                    title: "Sync Error",
+                    description: "An error occurred while syncing with Twitter/X",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              Sync Now
+            </Button>
+            <Button 
+              className="bg-[#1976d2] text-white hover:bg-[#1565c0]"
+              onClick={handleSaveConfig}
+            >
+              Save Configuration
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    );
+  };
+
   const DiscordSourceConfig = () => {
     const discordSource = sources.find(s => s.type === "discord");
     const [channelId, setChannelId] = useState(
@@ -258,6 +414,7 @@ const DataSources = () => {
           <TabsTrigger value="active">Active Sources</TabsTrigger>
           <TabsTrigger value="all">All Sources</TabsTrigger>
           <TabsTrigger value="discord">Discord</TabsTrigger>
+          <TabsTrigger value="twitter">Twitter/X</TabsTrigger>
         </TabsList>
         
         <TabsContent value="active">
@@ -422,6 +579,32 @@ const DataSources = () => {
                   onClick={() => window.location.href = "/integrations"}
                 >
                   Add Discord Integration
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="twitter">
+          {sources.some(s => s.type === "twitter") ? (
+            <TwitterSourceConfig />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <span className="material-icons text-3xl text-[#757575]">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="#757575">
+                    <path d="M21.3 3.02h-3.61c.5.37.95.79 1.35 1.26.53.66.71 1.66.18 2.32-.93 1.17-2.72 1.41-3.93 1.02-.67-.24-1.13-.69-1.55-1.25-.47-.61-.56-1.32-.51-2.11h-2.49c.05.8-.04 1.5-.51 2.11-.41.57-.88 1.01-1.55 1.25-1.21.38-3 .15-3.93-1.02-.53-.66-.35-1.66.18-2.32.4-.47.85-.89 1.35-1.26H2.7c-.45 0-.9.37-.9.82v15.84c0 .45.45.82.9.82h18.6c.45 0 .9-.37.9-.82V3.84c0-.45-.45-.82-.9-.82zM7.17 20c-1.12 0-2.03-.89-2.03-2 0-1.11.9-2 2.03-2 1.12 0 2.03.9 2.03 2S8.3 20 7.17 20zm9.66 0c-1.12 0-2.03-.9-2.03-2s.9-2 2.03-2c1.12 0 2.03.9 2.03 2s-.91 2-2.03 2zM16.23 9H7.77l1.25 5h5.96l1.25-5z"/>
+                  </svg>
+                </span>
+                <h3 className="mt-4 text-lg font-medium">Twitter/X Source Not Configured</h3>
+                <p className="mt-2 text-[#757575]">
+                  Add a Twitter/X integration in the Integrations section first.
+                </p>
+                <Button 
+                  className="mt-4 bg-[#1976d2] text-white hover:bg-[#1565c0]"
+                  onClick={() => window.location.href = "/integrations"}
+                >
+                  Add Twitter/X Integration
                 </Button>
               </CardContent>
             </Card>
