@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,12 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useToast } from "@/hooks/use-toast";
 import AddIntegrationModal from "@/components/modals/AddIntegrationModal";
+import EditIntegrationModal from "@/components/modals/EditIntegrationModal";
 import { Integration } from "@shared/schema";
 
 const Integrations = () => {
   const { integrations, updateIntegration, deleteIntegration } = useIntegration();
   const { toast } = useToast();
   const [showAddIntegrationModal, setShowAddIntegrationModal] = useState(false);
+  const [showEditIntegrationModal, setShowEditIntegrationModal] = useState(false);
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   
   const sources = integrations.filter(i => i.isSource);
   const destinations = integrations.filter(i => i.isDestination);
@@ -89,6 +92,11 @@ const Integrations = () => {
     }
   };
 
+  const handleEditIntegration = (integration: Integration) => {
+    setSelectedIntegration(integration);
+    setShowEditIntegrationModal(true);
+  };
+
   const IntegrationCard = ({ integration }: { integration: Integration }) => (
     <Card key={integration.id}>
       <CardContent className="p-4">
@@ -114,10 +122,18 @@ const Integrations = () => {
             </div>
           </div>
           
-          <div>
+          <div className="flex space-x-2">
+            <button 
+              className="text-[#757575] hover:text-[#1976d2]"
+              onClick={() => handleEditIntegration(integration)}
+              title="Edit Integration"
+            >
+              <span className="material-icons">edit</span>
+            </button>
             <button 
               className="text-[#757575] hover:text-[#1976d2]"
               onClick={() => handleRefreshIntegration(integration)}
+              title="Refresh Integration"
             >
               <span className="material-icons">refresh</span>
             </button>
@@ -146,10 +162,35 @@ const Integrations = () => {
                 </div>
               </>
             )}
+
+            {integration.type === "twitter" && (integration.additionalConfig as any)?.username && (
+              <>
+                <div className="text-[#757575]">Twitter Username:</div>
+                <div className="font-medium">
+                  @{(integration.additionalConfig as any).username}
+                </div>
+              </>
+            )}
+
+            {integration.type === "discord" && (integration.additionalConfig as any)?.channelId && (
+              <>
+                <div className="text-[#757575]">Discord Channel:</div>
+                <div className="font-medium truncate" title={(integration.additionalConfig as any).channelId}>
+                  {(integration.additionalConfig as any).channelId}
+                </div>
+              </>
+            )}
           </div>
         </div>
         
         <div className="mt-4 flex justify-end space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleEditIntegration(integration)}
+          >
+            Edit
+          </Button>
           <Button 
             variant="outline" 
             size="sm"
@@ -277,6 +318,14 @@ const Integrations = () => {
       <AddIntegrationModal
         isOpen={showAddIntegrationModal}
         onClose={() => setShowAddIntegrationModal(false)}
+      />
+      <EditIntegrationModal
+        integration={selectedIntegration}
+        isOpen={showEditIntegrationModal}
+        onClose={() => {
+          setShowEditIntegrationModal(false);
+          setSelectedIntegration(null);
+        }}
       />
     </div>
   );
