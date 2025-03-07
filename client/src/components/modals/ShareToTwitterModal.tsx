@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
   };
 
   // Set default message when news item changes
-  useState(() => {
+  React.useEffect(() => {
     if (newsItem) {
       // Create a default tweet with truncated content if needed
       const title = newsItem.title;
@@ -50,7 +50,7 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
       setMessage(tweetContent);
       setCharCount(tweetContent.length);
     }
-  });
+  }, [newsItem, charLimit]);
 
   const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newMessage = e.target.value;
@@ -64,7 +64,7 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
     setIsSharing(true);
     try {
       // Call Twitter share API
-      const response = await apiRequest<{ message: string; platforms: string[] }>({
+      const response = await apiRequest({
         url: "/api/integrations/twitter/share",
         method: "POST",
         body: { newsId: newsItem.id, message },

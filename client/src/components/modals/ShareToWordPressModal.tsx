@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +59,7 @@ const ShareToWordPressModal = ({ newsItem, isOpen, onClose }: ShareToWordPressMo
     setIsSharing(true);
     try {
       // Call WordPress share API
-      const response = await apiRequest<{ message: string; platforms: string[] }>({
+      const response = await apiRequest({
         url: "/api/integrations/wordpress/share",
         method: "POST",
         body: { 

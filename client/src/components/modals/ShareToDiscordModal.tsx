@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,11 +31,11 @@ const ShareToDiscordModal = ({ newsItem, isOpen, onClose }: ShareToDiscordModalP
   };
 
   // Set default message when news item changes
-  useState(() => {
+  React.useEffect(() => {
     if (newsItem) {
       setMessage(`📰 **${newsItem.title}**\n\n${newsItem.content}`);
     }
-  });
+  }, [newsItem]);
 
   const handleShare = async () => {
     if (!newsItem) return;
