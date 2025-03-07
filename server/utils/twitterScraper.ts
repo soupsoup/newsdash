@@ -13,6 +13,16 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
     // New approach: Try multiple different proxy services that don't require authentication
     // These are more likely to work in restricted environments like Replit
     const proxyServices = [
+      // NEW: Twitter official embed API - most reliable
+      {
+        url: `https://cdn.syndication.twimg.com/timeline/profile?screen_name=${username}&with_replies=false&count=20`,
+        type: 'official-embed',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'application/json',
+          'Referer': 'https://cdn.syndication.twimg.com/',
+        }
+      },
       // Public API gateways
       {
         url: `https://api.fxtwitter.com/${username}`,
@@ -59,7 +69,120 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
         }
         
         // Handle different response formats based on service type
-        if (service.type === 'fxtwitter' || service.type === 'vxtwitter') {
+        if (service.type === 'official-embed') {
+          try {
+            const data = await response.json() as any;
+            
+            if (data && data.timeline) {
+              console.log(`Successfully fetched data from official Twitter embed API`);
+              
+              const tweets: ScrapedTweet[] = [];
+              
+              // Parse the official embed format
+              if (data.timeline.instructions && Array.isArray(data.timeline.instructions)) {
+                // Extract tweets from timeline entries
+                for (const instruction of data.timeline.instructions) {
+                  if (instruction.addEntries && instruction.addEntries.entries) {
+                    for (const entry of instruction.addEntries.entries) {
+                      try {
+                        if (entry.content && entry.content.item && entry.content.item.content) {
+                          const tweet = entry.content.item.content.tweet;
+                          if (!tweet) continue;
+                          
+                          const user = tweet.user || {};
+                          const tweetId = tweet.id_str || `embed-${Date.now()}-${tweets.length}`;
+                          const tweetText = tweet.text || tweet.full_text || '';
+                          
+                          // For DeItaone, only include tweets that start with * or contain financial keywords
+                          const isFinancialTweet = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+                          
+                          if (isFinancialTweet) {
+                            // Check for financial tweet indicators
+                            const hasAsterisk = tweetText.startsWith('*');
+                            const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                            
+                            if (!hasAsterisk && !hasFinancialTerms) {
+                              continue;
+                            }
+                          }
+                          
+                          const createdAt = tweet.created_at ? new Date(tweet.created_at).toISOString() : new Date().toISOString();
+                          
+                          tweets.push({
+                            id: tweetId,
+                            text: tweetText,
+                            created_at: createdAt,
+                            user: {
+                              id: user.id_str || username,
+                              username: user.screen_name || username,
+                              name: user.name || (username === 'DeItaone' ? 'Delta One' : username),
+                              profile_image_url: user.profile_image_url_https || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                            }
+                          });
+                          
+                          if (tweets.length >= maxTweets) break;
+                        }
+                      } catch (entryError) {
+                        console.log('Error parsing entry from embed API:', entryError);
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // Alternative parsing if above didn't work
+              if (tweets.length === 0 && data.timeline.tweets) {
+                for (const tweet of data.timeline.tweets) {
+                  try {
+                    const tweetId = tweet.id_str || `embed-alt-${Date.now()}-${tweets.length}`;
+                    const tweetText = tweet.text || tweet.full_text || '';
+                    
+                    // For DeItaone, only include tweets that start with * or contain financial keywords
+                    const isFinancialTweet = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+                    
+                    if (isFinancialTweet) {
+                      const hasAsterisk = tweetText.startsWith('*');
+                      const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                      
+                      if (!hasAsterisk && !hasFinancialTerms) {
+                        continue;
+                      }
+                    }
+                    
+                    const createdAt = tweet.created_at ? new Date(tweet.created_at).toISOString() : new Date().toISOString();
+                    
+                    // Get user data from the users array
+                    const userData = data.timeline.users && data.timeline.users[tweet.user_id_str];
+                    
+                    tweets.push({
+                      id: tweetId,
+                      text: tweetText,
+                      created_at: createdAt,
+                      user: {
+                        id: userData?.id_str || username,
+                        username: userData?.screen_name || username,
+                        name: userData?.name || (username === 'DeItaone' ? 'Delta One' : username),
+                        profile_image_url: userData?.profile_image_url_https || 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
+                      }
+                    });
+                    
+                    if (tweets.length >= maxTweets) break;
+                  } catch (tweetError) {
+                    console.log('Error parsing tweet from embed API:', tweetError);
+                  }
+                }
+              }
+              
+              console.log(`Extracted ${tweets.length} tweets from official Twitter embed API`);
+              
+              if (tweets.length > 0) {
+                return tweets;
+              }
+            }
+          } catch (error) {
+            console.log(`Error parsing JSON from official embed API:`, error);
+          }
+        } else if (service.type === 'fxtwitter' || service.type === 'vxtwitter') {
           try {
             const data = await response.json() as any;
             
@@ -99,37 +222,80 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
           try {
             const text = await response.text();
             
-            // Simple RSS parsing without requiring additional dependencies
+            // More robust RSS parsing without requiring additional dependencies
             const items = text.match(/<item>[\s\S]*?<\/item>/g) || [];
             console.log(`Found ${items.length} RSS items for @${username}`);
             
             if (items.length > 0) {
               const tweets: ScrapedTweet[] = [];
               
+              // Log the first item for debugging
+              if (items.length > 0) {
+                console.log(`RSS Sample item content: ${items[0].substring(0, 150)}...`);
+              }
+              
+              // Improved parsing for Nitter RSS format
               for (const item of items.slice(0, maxTweets)) {
                 try {
-                  // Extract title (tweet text)
-                  const titleMatch = item.match(/<title>(.*?)<\/title>/);
-                  if (!titleMatch) continue;
-                  
-                  let tweetText = titleMatch[1];
-                  // Clean up any HTML entities
-                  tweetText = tweetText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-                  
-                  // For DeItaone, only include tweets that start with *
-                  if (username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone') {
-                    if (!tweetText.startsWith('*')) continue;
+                  // Extract title (tweet text) with better regex pattern that handles CDATA
+                  const titleMatch = item.match(/<title>(.*?)<\/title>/) || item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/);
+                  if (!titleMatch || !titleMatch[1]) {
+                    console.log('No title found in RSS item');
+                    continue;
                   }
                   
-                  // Extract publication date
-                  const dateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
-                  const pubDate = dateMatch ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+                  let tweetText = titleMatch[1];
+                  console.log(`Found tweet text in RSS: ${tweetText.substring(0, 50)}...`);
                   
-                  // Extract link to get tweet ID
-                  const linkMatch = item.match(/<link>(.*?)<\/link>/);
-                  const link = linkMatch ? linkMatch[1] : '';
-                  const idMatch = link.match(/status\/(\d+)/);
-                  const tweetId = idMatch ? idMatch[1] : `rss-${Date.now()}-${tweets.length}`;
+                  // Clean up any HTML entities and CDATA sections
+                  tweetText = tweetText
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&')
+                    .replace(/<!\[CDATA\[(.*?)\]\]>/, '$1')
+                    .trim();
+                  
+                  // For DeItaone, only include tweets that start with * or contain financial keywords
+                  const isFinancialTweet = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+                  
+                  if (isFinancialTweet) {
+                    // Check for financial tweet indicators (starts with * or has financial terms)
+                    const hasAsterisk = tweetText.startsWith('*');
+                    const hasFinancialTerms = /\b(FED|ECB|BOJ|GDP|CPI|INFLATION|RATE|MARKETS?|STOCKS?|TRADING|ECONOMY)\b/i.test(tweetText);
+                    
+                    if (!hasAsterisk && !hasFinancialTerms) {
+                      console.log(`Skipping non-financial tweet: ${tweetText.substring(0, 30)}...`);
+                      continue;
+                    }
+                  }
+                  
+                  // Extract publication date with better regex
+                  const dateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/) || item.match(/<published>(.*?)<\/published>/);
+                  const pubDate = dateMatch && dateMatch[1] ? new Date(dateMatch[1]).toISOString() : new Date().toISOString();
+                  
+                  // Extract link to get tweet ID with more flexible pattern
+                  const linkMatch = item.match(/<link>(.*?)<\/link>/) || item.match(/<guid.*?>(.*?)<\/guid>/);
+                  const link = linkMatch && linkMatch[1] ? linkMatch[1].trim() : '';
+                  
+                  // Try different patterns to extract the tweet ID
+                  let tweetId = `rss-${Date.now()}-${tweets.length}`;
+                  if (link) {
+                    const idMatchPatterns = [
+                      /status\/(\d+)/, // Twitter style
+                      /statuses\/(\d+)/, // Alternative Twitter format
+                      /(\d{10,})/ // Just find a long number that could be an ID
+                    ];
+                    
+                    for (const pattern of idMatchPatterns) {
+                      const match = link.match(pattern);
+                      if (match && match[1]) {
+                        tweetId = match[1];
+                        break;
+                      }
+                    }
+                  }
+                  
+                  console.log(`Successfully parsed RSS tweet: ID=${tweetId}, Text=${tweetText.substring(0, 30)}...`);
                   
                   tweets.push({
                     id: tweetId,
@@ -148,7 +314,10 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
               }
               
               if (tweets.length > 0) {
+                console.log(`Successfully extracted ${tweets.length} tweets from RSS feed`);
                 return tweets;
+              } else {
+                console.log('No valid tweets extracted from RSS items');
               }
             }
           } catch (error) {
