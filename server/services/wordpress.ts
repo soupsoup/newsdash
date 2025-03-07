@@ -41,9 +41,10 @@ export function setupWordPressService(app: Express, storage: IStorage) {
       const postTags = tags || ["financial", "news"];
 
       // Update the shared platforms for the news item
-      if (!newsItem.sharedTo.includes("wordpress")) {
+      const currentSharedTo = newsItem.sharedTo || [];
+      if (!currentSharedTo.includes("wordpress")) {
         const updatedNewsItem = await storage.updateNewsItem(newsItem.id, {
-          sharedTo: [...newsItem.sharedTo, "wordpress"],
+          sharedTo: [...currentSharedTo, "wordpress"],
         });
       }
 
