@@ -17,7 +17,9 @@ async function fetchTweetsFromUser(username: string, limit = 7): Promise<{
   tweets: any[],
   success: boolean,
   error?: string,
-  scrapingMethod?: string
+  scrapingMethod?: string,
+  details?: string[] | string,
+  tips?: string[]
 }> {
   try {
     console.log(`Fetching tweets from ${username}`);
@@ -64,7 +66,12 @@ async function fetchTweetsFromUser(username: string, limit = 7): Promise<{
     return {
       tweets: [],
       success: false,
-      error: `Error retrieving tweets: ${error.message || 'Unknown error'}`
+      error: `Error retrieving tweets: ${error.message || 'Unknown error'}`,
+      details: (error as any).details || ['Twitter web scraping failed'],
+      tips: (error as any).tips || [
+        'Try again in a few minutes',
+        'Twitter has strong anti-scraping measures that can block automated access'
+      ]
     };
   }
 }
@@ -193,8 +200,8 @@ export function setupTwitterService(app: Express, storage: IStorage) {
               name: integration.name,
               success: false,
               error: `Unable to retrieve tweets from @${username}. Web scraping failed and no mock data is being used as per requirements.`,
-              details: result.error || 'Unknown error',
-              tips: [
+              details: result.details || result.error || 'Unknown error',
+              tips: result.tips || [
                 'Twitter has strong anti-scraping measures',
                 'Try again later or with a different username',
                 'Consider using a real Twitter API key if available'
@@ -244,11 +251,21 @@ export function setupTwitterService(app: Express, storage: IStorage) {
             lastSyncAt: new Date(),
           });
           
+          // Extract any detailed error info
+          const errorDetails = (err as any).details || null;
+          const errorTips = (err as any).tips || null;
+          
           syncResults.push({
             integrationId: integration.id,
             name: integration.name,
             success: false,
-            error: `Error accessing Twitter data: ${(err as Error).message}. No mock data is being used as per requirements.`
+            error: `Error accessing Twitter data: ${(err as Error).message}. No mock data is being used as per requirements.`,
+            details: errorDetails,
+            tips: errorTips || [
+              'Twitter has strong anti-scraping measures',
+              'Try again later or with a different username',
+              'Consider using a real Twitter API key if available'
+            ]
           });
         }
       }

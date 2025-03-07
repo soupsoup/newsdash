@@ -127,8 +127,22 @@ export async function scrapeTweetsFromProfile(username: string, maxTweets = 10):
   } catch (error) {
     console.error('Error scraping tweets:', error);
     console.log('All scraping methods failed - no fallback data will be used as per requirements');
+    
+    // Create meaningful error that can be propagated up
+    const err = new Error('Failed to retrieve Twitter data');
+    (err as any).details = [
+      'Twitter has anti-scraping measures that block automated access',
+      'Replit environment may have restricted network access to Twitter services',
+      'All scraping methods have been attempted and failed'
+    ];
+    (err as any).tips = [
+      'Try again in a few minutes',
+      'DeItaone financial tweets are the primary target for this application',
+      'Twitter scraping is inherently unreliable without official API access'
+    ];
+    
     // Per requirements, we don't use mock/fallback data
-    return [];
+    throw err;
   }
 }
 
