@@ -32,9 +32,21 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
         url: `https://api.vxtwitter.com/${username}`,
         type: 'vxtwitter'
       },
-      // RSS-based services
+      // RSS-based services (multiple Nitter instances for redundancy)
+      {
+        url: `https://nitter.net/${username}/rss`,
+        type: 'rss'
+      },
       {
         url: `https://nitter.privacydev.net/${username}/rss`,
+        type: 'rss'
+      },
+      {
+        url: `https://nitter.unixfox.eu/${username}/rss`,
+        type: 'rss'
+      },
+      {
+        url: `https://nitter.42l.fr/${username}/rss`,
         type: 'rss'
       },
       // Twitter public consumer API proxies
@@ -272,23 +284,23 @@ async function getRecentTweetsViaProxy(username: string, maxTweets = 10): Promis
                     .replace(/<!\[CDATA\[(.*?)\]\]>/, '$1')
                     .trim();
                   
-                  // Removed strict financial filtering to get more recent tweets as requested
-                  // Only perform minimal filtering to avoid spam
-                  const isFinancialTweet = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
+                  // For DeItaone, accept all tweets to ensure we get the most recent content
+                  // Only skip obvious promotional tweets
+                  const isDeltaAccount = username.toLowerCase() === 'deitaone' || username.toLowerCase() === 'deltaone';
                   
-                  if (isFinancialTweet) {
-                    // Only skip obvious non-financial/promotional tweets
-                    const isObviouslyNonFinancial = 
+                  if (isDeltaAccount) {
+                    // Only skip obvious promotional tweets
+                    const isPromotional = 
                       tweetText.includes('Follow us on') || 
                       tweetText.includes('Subscribe to') ||
                       tweetText.includes('Click here to');
                     
-                    if (isObviouslyNonFinancial) {
+                    if (isPromotional) {
                       console.log(`Skipping promotional tweet: ${tweetText.substring(0, 30)}...`);
                       continue;
                     }
                     
-                    // Log the tweet we're keeping
+                    // Accept all other tweets from Delta accounts
                     console.log(`Keeping tweet: ${tweetText.substring(0, 30)}...`);
                   }
                   
@@ -585,22 +597,21 @@ async function scrapeFromNitter(username: string, maxTweets = 10): Promise<Scrap
               const tweetText = tweetTextElement.text().trim();
               if (!tweetText) return;
               
-              // For financial tweets like DeItaone, the text is often in uppercase
-              // This is especially useful for ensuring we capture the right content
-              const isFinancialTweet = username.toLowerCase() === 'deltaone' || 
-                                      username.toLowerCase() === 'deitaone';
+              // For financial tweets like DeItaone, we want all recent tweets regardless of content
+              // Only skip obvious promotional content to get the freshest tweets
+              const isDeltaAccount = username.toLowerCase() === 'deltaone' || 
+                                    username.toLowerCase() === 'deitaone';
               
-              // Removed strict filtering to show the most recent tweets
-              if (isFinancialTweet) {
-                // Only filter out obvious promotional tweets
-                const isObviouslyPromotional = 
+              if (isDeltaAccount) {
+                // Accept all non-promotional tweets to ensure we get the most recent content
+                const isPromotional = 
                   tweetText.includes('Follow us on') || 
                   tweetText.includes('Subscribe to') ||
                   tweetText.includes('Click here to');
                 
-                if (isObviouslyPromotional) return;
+                if (isPromotional) return;
                 
-                // Log tweets we're keeping
+                // Accept all other tweets from Delta accounts
                 console.log(`Keeping Nitter tweet: ${tweetText.substring(0, 30)}...`);
               }
               

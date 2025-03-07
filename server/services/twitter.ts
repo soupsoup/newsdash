@@ -180,6 +180,17 @@ export function setupTwitterService(app: Express, storage: IStorage) {
         });
       }
 
+      // Get all current tweets from storage
+      const allNewsItems = await storage.getAllNewsItems();
+      
+      // Delete all existing Twitter news items to ensure we get fresh content
+      const twitterItems = allNewsItems.filter(item => item.sourceType === "twitter");
+      for (const item of twitterItems) {
+        await storage.deleteNewsItem(item.id);
+      }
+      
+      console.log(`Cleared ${twitterItems.length} existing Twitter news items to ensure fresh content`);
+      
       const syncResults = [];
 
       // Process each active Twitter integration
@@ -221,17 +232,13 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           // Convert tweets to news items
           const newsItems = scrapedTweetsToNewsItems(result.tweets, integration.name);
           
-          // Store the news items
+          // Store the news items - since we cleared the database, we can add all items
           const createdItems = [];
           for (const item of newsItems) {
-            // Check if we already have this tweet by externalId
-            const existingItems = (await storage.getAllNewsItems())
-              .filter(n => n.externalId === item.externalId);
-            
-            if (existingItems.length === 0) {
-              const newsItem = await storage.createNewsItem(item);
-              createdItems.push(newsItem);
-            }
+            // Since we're clearing the database first, there shouldn't be duplicates
+            // Just create all news items
+            const newsItem = await storage.createNewsItem(item);
+            createdItems.push(newsItem);
           }
 
           // Update the integration's lastSyncAt time and status
