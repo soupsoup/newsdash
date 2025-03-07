@@ -40,10 +40,10 @@ const DataSources = () => {
   const DiscordSourceConfig = () => {
     const discordSource = sources.find(s => s.type === "discord");
     const [channelId, setChannelId] = useState(
-      discordSource?.additionalConfig?.channelId || "708365137660215330"
+      (discordSource?.additionalConfig as Record<string, any>)?.channelId || "708365137660215330"
     );
     const [serverId, setServerId] = useState(
-      discordSource?.additionalConfig?.serverId || "708365137660215327"
+      (discordSource?.additionalConfig as Record<string, any>)?.serverId || "708365137660215327"
     );
     
     const handleSaveConfig = async () => {
@@ -60,7 +60,7 @@ const DataSources = () => {
         const updatedIntegration = {
           ...discordSource,
           additionalConfig: {
-            ...discordSource.additionalConfig,
+            ...((discordSource.additionalConfig || {}) as Record<string, any>),
             channelId,
             serverId,
           },
@@ -205,7 +205,7 @@ const DataSources = () => {
                           className="w-full"
                           onClick={() => {
                             // Navigate to configuration tab
-                            const tabElement = document.querySelector(`[data-state="inactive"][value="${source.type}"]`) as HTMLButtonElement;
+                            const tabElement = document.querySelector(`[value="${source.type}"]`) as HTMLButtonElement;
                             if (tabElement) tabElement.click();
                           }}
                         >
@@ -277,7 +277,7 @@ const DataSources = () => {
                         className="w-full"
                         onClick={() => {
                           // Navigate to configuration tab
-                          const tabElement = document.querySelector(`[data-state="inactive"][value="${source.type}"]`) as HTMLButtonElement;
+                          const tabElement = document.querySelector(`[value="${source.type}"]`) as HTMLButtonElement;
                           if (tabElement) tabElement.click();
                         }}
                       >
