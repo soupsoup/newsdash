@@ -35,7 +35,14 @@ async function fetchDiscordMessages(channelId: string, limit = 10): Promise<Disc
 
     if (!response.ok) {
       const errorData = await response.json() as { message?: string };
-      throw new Error(`Discord API error: ${errorData.message || response.statusText}`);
+      const errorMessage = errorData.message || response.statusText;
+      
+      // Add more specific error message for Missing Access
+      if (errorMessage === "Missing Access") {
+        throw new Error(`Discord API error: Missing Access - The bot doesn't have permission to view this channel. Make sure the bot is added to the channel and has the 'Read Messages/View Channels' permission.`);
+      } else {
+        throw new Error(`Discord API error: ${errorMessage}`);
+      }
     }
 
     return await response.json() as DiscordMessage[];
@@ -114,11 +121,11 @@ export function setupDiscordService(app: Express, storage: IStorage) {
           });
         }
         
-        const data = await response.json();
+        const data = await response.json() as { username?: string };
         return res.status(200).json({ 
           success: true, 
           message: "Discord bot token is valid",
-          botUsername: data.username
+          botUsername: data.username || "Discord Bot"
         });
       } catch (err) {
         return res.status(400).json({ 

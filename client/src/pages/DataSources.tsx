@@ -104,6 +104,7 @@ const DataSources = () => {
               <li>Select "bot" scope and the following permissions: "Read Messages/View Channels", "Read Message History"</li>
               <li>Generate and use the URL to invite the bot to your server</li>
               <li>Make sure the bot has access to the channel you want to pull from</li>
+              <li><strong>Important:</strong> For private channels, you must add the bot to that specific channel or give it appropriate role permissions</li>
             </ol>
             <div className="mt-2">
               <Button
