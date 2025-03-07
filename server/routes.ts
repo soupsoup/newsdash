@@ -183,10 +183,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Integration not found" });
       }
       
-      const updatedIntegration = await storage.updateIntegration(id, req.body);
+      console.log("Integration update request body:", req.body);
+      
+      // Clean and validate the update payload
+      const updateData = {
+        name: req.body.name || integration.name,
+        isSource: req.body.isSource !== undefined ? req.body.isSource : integration.isSource,
+        isDestination: req.body.isDestination !== undefined ? req.body.isDestination : integration.isDestination,
+        apiKey: req.body.apiKey !== undefined ? req.body.apiKey : integration.apiKey,
+        apiSecret: req.body.apiSecret !== undefined ? req.body.apiSecret : integration.apiSecret,
+        accessToken: req.body.accessToken !== undefined ? req.body.accessToken : integration.accessToken,
+        refreshToken: req.body.refreshToken !== undefined ? req.body.refreshToken : integration.refreshToken,
+        webhookUrl: req.body.webhookUrl !== undefined ? req.body.webhookUrl : integration.webhookUrl,
+        additionalConfig: req.body.additionalConfig !== undefined ? req.body.additionalConfig : integration.additionalConfig
+      };
+      
+      console.log("Cleaned update data:", updateData);
+      
+      const updatedIntegration = await storage.updateIntegration(id, updateData);
+      console.log("Updated integration result:", updatedIntegration);
+      
       res.json(updatedIntegration);
     } catch (error) {
-      res.status(500).json({ message: "Failed to update integration" });
+      console.error("Integration update error:", error);
+      res.status(500).json({ 
+        message: "Failed to update integration", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 

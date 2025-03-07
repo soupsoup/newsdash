@@ -70,8 +70,27 @@ export function IntegrationProvider({ children }: { children: ReactNode }) {
 
   const updateIntegration = async (integration: Integration) => {
     try {
-      const response = await apiRequest("PATCH", `/api/integrations/${integration.id}`, integration);
+      console.log("Updating integration:", integration);
+      
+      // Create a clean object with only the fields we want to update
+      const updateData = {
+        id: integration.id,
+        name: integration.name,
+        isSource: integration.isSource ?? false,
+        isDestination: integration.isDestination ?? false,
+        apiKey: integration.apiKey ?? null,
+        apiSecret: integration.apiSecret ?? null,
+        accessToken: integration.accessToken ?? null,
+        refreshToken: integration.refreshToken ?? null,
+        webhookUrl: integration.webhookUrl ?? null,
+        additionalConfig: integration.additionalConfig ?? null
+      };
+      
+      console.log("Clean update data:", updateData);
+      
+      const response = await apiRequest("PATCH", `/api/integrations/${integration.id}`, updateData);
       const updatedIntegration = await response.json();
+      console.log("Updated integration response:", updatedIntegration);
       
       setIntegrations(prev => 
         prev.map(item => item.id === updatedIntegration.id ? updatedIntegration : item)
@@ -80,6 +99,7 @@ export function IntegrationProvider({ children }: { children: ReactNode }) {
       
       return updatedIntegration;
     } catch (err) {
+      console.error("Integration update error:", err);
       setError(err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
