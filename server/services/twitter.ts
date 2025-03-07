@@ -1,10 +1,308 @@
 import { Express } from "express";
 import { IStorage } from "../storage";
+import { InsertNewsItem } from "../../shared/schema";
+import fetch from "node-fetch";
 
 // Twitter/X API endpoints would normally use a Twitter API client
 // but we'll implement the core functionality without dependencies
 
+// Simulated DeItaone tweets
+const DELTA_ONE_TWEETS = [
+  {
+    id: "1768265371583541248",
+    text: "*GOLDMAN RAISES S&P 500 TARGET TO 5,200 FROM 5,100",
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone",
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768254838435152143",
+    text: "*FED SURVEY: HOUSEHOLD FINANCES IMPROVED BROADLY IN LATE 2023",
+    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone",
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768253123485958345",
+    text: "*JPMORGAN'S KOLANOVIC SAYS 'MAXIMUM GREED' HAS TAKEN OVER MARKETS",
+    created_at: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone",
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768249988782424370",
+    text: "*SENATE PANEL PASSES BILL TO BAN TIKTOK IF BYTEDANCE DOESN'T SELL IT",
+    created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone",
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768243923468488923",
+    text: "*US MARCH MICHIGAN SENTIMENT INDEX FALLS TO 76.5; EST. 77.0",
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone",
+      name: "Delta One", 
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768083465324146123",
+    text: "*JPMORGAN STRATEGISTS SAY STOCKS FACE 10% DROP IN A CORRECTION",
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898", 
+      username: "DeItaone",
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  },
+  {
+    id: "1768032284953178542",
+    text: "*CORE US CPI RISES 0.4% M/M; EST. 0.3%; MOST SINCE SEPT. 2023",
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    user: {
+      id: "1156910898",
+      username: "DeItaone", 
+      name: "Delta One",
+      profile_image_url: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"
+    }
+  }
+];
+
+// Helper function to convert tweets to news items
+function tweetsToNewsItems(tweets: any[], sourceName: string): InsertNewsItem[] {
+  return tweets.map(tweet => {
+    // Format metadata as a valid Record<string, any>
+    const metadata: Record<string, any> = {
+      tweetId: tweet.id,
+      userId: tweet.user.id,
+      username: tweet.user.username,
+      timestamp: tweet.created_at,
+      profileImageUrl: tweet.user.profile_image_url
+    };
+    
+    return {
+      title: tweet.text,
+      content: tweet.text,
+      source: `X/Twitter: ${sourceName}`,
+      sourceType: "twitter",
+      externalId: tweet.id,
+      metadata,
+    };
+  });
+}
+
+// Simulated function to fetch tweets from DeItaone
+async function fetchTweetsFromDeItaone(limit = 5): Promise<any[]> {
+  // In a real implementation, we would use the Twitter API
+  // For now, return our simulated tweets
+  return DELTA_ONE_TWEETS.slice(0, limit);
+}
+
+// Function to periodically check for new tweets
+function startPeriodicTwitterSync(storage: IStorage) {
+  // Check for new tweets every 15 minutes
+  const SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+  setInterval(async () => {
+    try {
+      // Get active Twitter integrations
+      const twitterIntegrations = await storage.getIntegrationsByType("twitter");
+      const activeIntegrations = twitterIntegrations.filter(
+        (integration) => integration.isSource && integration.status === "connected"
+      );
+
+      if (activeIntegrations.length === 0) {
+        return;
+      }
+
+      // Process each active Twitter integration
+      for (const integration of activeIntegrations) {
+        try {
+          // Extract configuration
+          const config = integration.additionalConfig as Record<string, unknown> || {};
+          const username = (config.username as string) || "DeItaone";
+          
+          // Fetch tweets
+          console.log(`[Periodic Sync] Fetching tweets from ${username}`);
+          const tweets = await fetchTweetsFromDeItaone(5);
+          console.log(`[Periodic Sync] Fetched ${tweets.length} tweets from ${username}`);
+          
+          // Convert tweets to news items
+          const newsItems = tweetsToNewsItems(tweets, integration.name);
+          
+          // Store new items
+          let itemsCreated = 0;
+          for (const item of newsItems) {
+            // Check if we already have this tweet by externalId
+            const existingItems = (await storage.getAllNewsItems())
+              .filter(n => n.externalId === item.externalId);
+            
+            if (existingItems.length === 0) {
+              await storage.createNewsItem(item);
+              itemsCreated++;
+            }
+          }
+
+          // Update the integration's lastSyncAt time
+          await storage.updateIntegration(integration.id, {
+            lastSyncAt: new Date(),
+          });
+
+          console.log(`[Periodic Sync] Completed Twitter sync for integration ${integration.id}, created ${itemsCreated} new items`);
+        } catch (err) {
+          console.error(`[Periodic Sync] Twitter sync error for integration ${integration.id}:`, err);
+        }
+      }
+    } catch (error) {
+      console.error("[Periodic Sync] Periodic Twitter sync error:", error);
+    }
+  }, SYNC_INTERVAL);
+}
+
 export function setupTwitterService(app: Express, storage: IStorage) {
+  // API endpoint to manually trigger a Twitter sync for DeItaone
+  app.post("/api/integrations/twitter/sync", async (req, res) => {
+    try {
+      // Get active Twitter integrations
+      const twitterIntegrations = await storage.getIntegrationsByType("twitter");
+      const activeIntegrations = twitterIntegrations.filter(
+        (integration) => integration.isSource && integration.status === "connected"
+      );
+
+      if (activeIntegrations.length === 0) {
+        return res.status(400).json({ message: "No active Twitter integrations found" });
+      }
+
+      const syncResults = [];
+
+      // Process each active Twitter integration
+      for (const integration of activeIntegrations) {
+        try {
+          // Extract configuration
+          const config = integration.additionalConfig as Record<string, unknown> || {};
+          const username = (config.username as string) || "DeItaone";
+          
+          // Fetch tweets from DeItaone using our helper function
+          console.log(`Fetching tweets from ${username}`);
+          const tweets = await fetchTweetsFromDeItaone(7);
+          console.log(`Fetched ${tweets.length} tweets from ${username}`);
+          
+          // Convert tweets to news items
+          const newsItems = tweetsToNewsItems(tweets, integration.name);
+          
+          // Store the news items
+          const createdItems = [];
+          for (const item of newsItems) {
+            // Check if we already have this tweet by externalId
+            const existingItems = (await storage.getAllNewsItems())
+              .filter(n => n.externalId === item.externalId);
+            
+            if (existingItems.length === 0) {
+              const newsItem = await storage.createNewsItem(item);
+              createdItems.push(newsItem);
+            }
+          }
+
+          // Update the integration's lastSyncAt time
+          await storage.updateIntegration(integration.id, {
+            lastSyncAt: new Date(),
+          });
+
+          syncResults.push({
+            integrationId: integration.id,
+            name: integration.name,
+            itemsCreated: createdItems.length,
+            totalFetched: tweets.length,
+            success: true,
+          });
+        } catch (err) {
+          console.error(`Twitter sync error for integration ${integration.id}:`, err);
+          syncResults.push({
+            integrationId: integration.id,
+            name: integration.name,
+            success: false,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      res.json({
+        message: "Twitter sync completed",
+        results: syncResults,
+      });
+    } catch (error) {
+      console.error("Twitter sync error:", error);
+      res.status(500).json({ message: "Twitter sync processing error" });
+    }
+  });
+
+  // API endpoint to check if we can access a user's tweets
+  app.post("/api/integrations/twitter/check-account", async (req, res) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Twitter username is required" 
+        });
+      }
+      
+      // In a real implementation, we would try to access the user's tweets
+      // For now, we'll simulate success for DeItaone or failure for other accounts
+      
+      if (username.toLowerCase() === "deltaone" || username.toLowerCase() === "deltone") {
+        return res.status(200).json({
+          success: true,
+          message: "Successfully accessed @DeItaone tweets",
+          accountInfo: {
+            id: "1156910898",
+            username: "DeItaone",
+            name: "Delta One",
+            profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
+            followersCount: 231500,
+            tweetsCount: 156923
+          }
+        });
+      } else {
+        // For demo purposes, we'll suggest DeItaone instead
+        return res.status(400).json({
+          success: false,
+          message: `Unable to access tweets from @${username}. Consider using @DeItaone instead.`,
+          suggestions: ["DeItaone"]
+        });
+      }
+    } catch (error) {
+      console.error("Twitter account check error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check Twitter account",
+        error: (error as Error).message
+      });
+    }
+  });
+
+  // Start periodic sync if enabled
+  startPeriodicTwitterSync(storage);
   // API endpoint to share news to Twitter/X
   app.post("/api/integrations/twitter/share", async (req, res) => {
     try {
@@ -37,9 +335,10 @@ export function setupTwitterService(app: Express, storage: IStorage) {
       const tweetContent = message || `${newsItem.title}\n\n${newsItem.content.substring(0, 200)}${newsItem.content.length > 200 ? '...' : ''}`;
 
       // Update the shared platforms for the news item
-      if (!newsItem.sharedTo.includes("twitter")) {
+      const currentSharedTo = newsItem.sharedTo || [];
+      if (!currentSharedTo.includes("twitter")) {
         const updatedNewsItem = await storage.updateNewsItem(newsItem.id, {
-          sharedTo: [...newsItem.sharedTo, "twitter"],
+          sharedTo: [...currentSharedTo, "twitter"],
         });
       }
 
