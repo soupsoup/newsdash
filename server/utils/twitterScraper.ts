@@ -957,6 +957,22 @@ function findTweetsInJsonData(jsonData: any, username: string, maxTweets: number
  */
 export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): InsertNewsItem[] {
   return tweets.map(tweet => {
+    // Parse the tweet creation date
+    let publishedAt: Date;
+    try {
+      // Try to parse the original tweet timestamp
+      publishedAt = new Date(tweet.created_at);
+      
+      // Validate the date - if it's invalid (e.g., NaN), use current time
+      if (isNaN(publishedAt.getTime())) {
+        console.log(`Invalid date format for tweet ${tweet.id}: "${tweet.created_at}". Using current time.`);
+        publishedAt = new Date();
+      }
+    } catch (error) {
+      console.log(`Error parsing tweet date: ${error}. Using current time.`);
+      publishedAt = new Date();
+    }
+    
     // Format metadata
     const metadata: Record<string, any> = {
       tweetId: tweet.id,
@@ -973,6 +989,7 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
       sourceType: "twitter",
       externalId: tweet.id,
       metadata,
+      publishedAt, // Include the parsed date
     };
   });
 }

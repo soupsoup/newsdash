@@ -162,10 +162,16 @@ export class MemStorage implements IStorage {
   
   async createNewsItem(insertNewsItem: InsertNewsItem): Promise<NewsItem> {
     const id = this.newsIdCounter++;
+    
+    // Use the provided publishedAt date if it exists, otherwise use current time
+    const publishedAt = insertNewsItem.publishedAt instanceof Date 
+      ? insertNewsItem.publishedAt 
+      : new Date();
+      
     const newsItem: NewsItem = {
       ...insertNewsItem,
       id,
-      publishedAt: new Date(),
+      publishedAt, // Use the date from above logic
       sharedTo: []
     };
     

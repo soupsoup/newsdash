@@ -64,6 +64,9 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type NewsItem = typeof newsItems.$inferSelect;
-export type InsertNewsItem = z.infer<typeof insertNewsItemSchema>;
+// Extended insert news item type to optionally include publishedAt
+export type InsertNewsItem = z.infer<typeof insertNewsItemSchema> & {
+  publishedAt?: Date;
+};
 export type Integration = typeof integrations.$inferSelect;
 export type InsertIntegration = z.infer<typeof insertIntegrationSchema>;
