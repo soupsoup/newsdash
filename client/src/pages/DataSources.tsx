@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Integration } from "@shared/schema";
 
 const DataSources = () => {
-  const { integrations, updateIntegration } = useIntegration();
+  const { integrations, updateIntegration, refreshIntegrations } = useIntegration();
   const { toast } = useToast();
   
   const sources = integrations.filter(i => i.isSource);
@@ -91,6 +91,58 @@ const DataSources = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="p-4 mb-4 border-l-4 border-amber-500 bg-amber-50 text-amber-800">
+            <h4 className="text-sm font-bold mb-2">Bot Setup Required</h4>
+            <p className="text-xs mb-2">
+              To use this integration, you need to:
+            </p>
+            <ol className="text-xs list-decimal ml-4 space-y-1 mb-2">
+              <li>Go to your <a href="https://discord.com/developers/applications" target="_blank" className="text-blue-600 underline">Discord Developer Portal</a></li>
+              <li>Select your bot application</li>
+              <li>Copy your Bot Token and set it as the <strong>DISCORD_BOT_TOKEN</strong> secret in this app</li>
+              <li>Go to the "OAuth2" → "URL Generator" section</li>
+              <li>Select "bot" scope and the following permissions: "Read Messages/View Channels", "Read Message History"</li>
+              <li>Generate and use the URL to invite the bot to your server</li>
+              <li>Make sure the bot has access to the channel you want to pull from</li>
+            </ol>
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs w-full"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/integrations/discord/check', {
+                      method: 'GET',
+                    });
+                    
+                    if (response.ok) {
+                      toast({
+                        title: "Bot Token Setup",
+                        description: "Discord bot token is configured correctly!",
+                      });
+                    } else {
+                      const data = await response.json();
+                      toast({
+                        title: "Bot Token Missing",
+                        description: data.error || "Please set up your Discord bot token in the environment variables",
+                        variant: "destructive",
+                      });
+                    }
+                  } catch (error) {
+                    toast({
+                      title: "Connection Error",
+                      description: "Failed to check Discord bot token",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                Check Bot Token Setup
+              </Button>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="server-id">Discord Server ID</Label>
             <Input

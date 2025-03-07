@@ -87,7 +87,55 @@ export function setupDiscordService(app: Express, storage: IStorage) {
     }
   });
 
-// API endpoint to manually trigger a Discord sync
+  // API endpoint to check if the Discord token is set up
+  app.get("/api/integrations/discord/check", async (req, res) => {
+    try {
+      if (!DISCORD_BOT_TOKEN) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Discord bot token is not configured. Please set the DISCORD_BOT_TOKEN environment variable." 
+        });
+      }
+      
+      // Attempt to make a simple API call to verify the token
+      try {
+        const response = await fetch(`${DISCORD_API_URL}/users/@me`, {
+          headers: {
+            Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json() as { message?: string };
+          return res.status(400).json({ 
+            success: false, 
+            error: `Invalid Discord bot token: ${errorData.message || response.statusText}` 
+          });
+        }
+        
+        const data = await response.json();
+        return res.status(200).json({ 
+          success: true, 
+          message: "Discord bot token is valid",
+          botUsername: data.username
+        });
+      } catch (err) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Error validating Discord token: ${(err as Error).message}` 
+        });
+      }
+    } catch (error) {
+      console.error("Discord token check error:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to check Discord token"
+      });
+    }
+  });
+
+  // API endpoint to manually trigger a Discord sync
   app.post("/api/integrations/discord/sync", async (req, res) => {
     try {
       // Get active Discord integrations
