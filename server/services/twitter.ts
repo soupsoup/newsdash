@@ -13,7 +13,12 @@ import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems 
  * @param limit Maximum number of tweets to fetch
  * @returns Array of tweet objects
  */
-async function fetchTweetsFromUser(username: string, limit = 7): Promise<any[]> {
+async function fetchTweetsFromUser(username: string, limit = 7): Promise<{
+  tweets: any[],
+  success: boolean,
+  error?: string,
+  scrapingMethod?: string
+}> {
   try {
     console.log(`Fetching tweets from ${username}`);
     
@@ -31,10 +36,36 @@ async function fetchTweetsFromUser(username: string, limit = 7): Promise<any[]> 
     const tweets = await scrapeTweetsFromProfile(finalUsername, limit);
     console.log(`Fetched ${tweets.length} tweets from ${finalUsername}`);
     
-    return tweets;
-  } catch (error) {
+    if (tweets.length > 0) {
+      // Determine which scraping method was used based on the tweet ID format
+      let scrapingMethod = 'Unknown';
+      if (tweets[0].id.startsWith('proxy-')) {
+        scrapingMethod = 'API Proxy';
+      } else if (tweets[0].id.startsWith('x-')) {
+        scrapingMethod = 'Direct Scraping';
+      } else {
+        scrapingMethod = 'Nitter';
+      }
+      
+      return {
+        tweets,
+        success: true,
+        scrapingMethod
+      };
+    } else {
+      return {
+        tweets: [],
+        success: false,
+        error: `No tweets could be retrieved from @${finalUsername}. Twitter's anti-scraping measures may be blocking access.`
+      };
+    }
+  } catch (error: any) {
     console.error(`Error fetching tweets from ${username}:`, error);
-    throw error;
+    return {
+      tweets: [],
+      success: false,
+      error: `Error retrieving tweets: ${error.message || 'Unknown error'}`
+    };
   }
 }
 
@@ -64,24 +95,24 @@ function startPeriodicTwitterSync(storage: IStorage) {
           
           // Fetch tweets using our scraper
           console.log(`[Periodic Sync] Fetching tweets from ${username}`);
-          const tweets = await fetchTweetsFromUser(username, 5);
+          const result = await fetchTweetsFromUser(username, 5);
           
           // Check if we got any tweets
-          if (tweets.length === 0) {
+          if (!result.success || result.tweets.length === 0) {
             // Update the integration to show it's having issues
             await storage.updateIntegration(integration.id, {
               status: "error",
               lastSyncAt: new Date()
             });
             
-            console.log(`[Periodic Sync] Failed to retrieve tweets from @${username}. No mock data will be used.`);
+            console.log(`[Periodic Sync] Failed to retrieve tweets from @${username}: ${result.error || 'Unknown error'}. No mock data will be used.`);
             continue;
           }
           
-          console.log(`[Periodic Sync] Fetched ${tweets.length} tweets from ${username}`);
+          console.log(`[Periodic Sync] Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
           
           // Convert tweets to news items
-          const newsItems = scrapedTweetsToNewsItems(tweets, integration.name);
+          const newsItems = scrapedTweetsToNewsItems(result.tweets, integration.name);
           
           // Store new items
           let itemsCreated = 0;
@@ -147,10 +178,10 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           
           // Fetch tweets using our scraper
           console.log(`Fetching tweets from ${username}`);
-          const tweets = await fetchTweetsFromUser(username, 7);
+          const result = await fetchTweetsFromUser(username, 7);
           
           // Check if we got any tweets
-          if (tweets.length === 0) {
+          if (!result.success || result.tweets.length === 0) {
             // Update the integration to show it's having issues
             await storage.updateIntegration(integration.id, {
               status: "error",
@@ -161,15 +192,21 @@ export function setupTwitterService(app: Express, storage: IStorage) {
               integrationId: integration.id,
               name: integration.name,
               success: false,
-              error: `Unable to retrieve tweets from @${username}. Web scraping failed and no mock data is being used as per requirements.`
+              error: `Unable to retrieve tweets from @${username}. Web scraping failed and no mock data is being used as per requirements.`,
+              details: result.error || 'Unknown error',
+              tips: [
+                'Twitter has strong anti-scraping measures',
+                'Try again later or with a different username',
+                'Consider using a real Twitter API key if available'
+              ]
             });
             continue;
           }
           
-          console.log(`Fetched ${tweets.length} tweets from ${username}`);
+          console.log(`Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
           
           // Convert tweets to news items
-          const newsItems = scrapedTweetsToNewsItems(tweets, integration.name);
+          const newsItems = scrapedTweetsToNewsItems(result.tweets, integration.name);
           
           // Store the news items
           const createdItems = [];
@@ -194,7 +231,8 @@ export function setupTwitterService(app: Express, storage: IStorage) {
             integrationId: integration.id,
             name: integration.name,
             itemsCreated: createdItems.length,
-            totalFetched: tweets.length,
+            totalFetched: result.tweets.length,
+            method: result.scrapingMethod,
             success: true,
           });
         } catch (err) {
