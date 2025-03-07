@@ -9,8 +9,10 @@ export const newsItems = pgTable("news_items", {
   content: text("content").notNull(),
   source: text("source").notNull(),
   sourceType: text("source_type").notNull(),
+  externalId: text("external_id"), // Unique ID from external source
   publishedAt: timestamp("published_at").notNull().defaultNow(),
   sharedTo: jsonb("shared_to").$type<string[]>().default([]),
+  metadata: jsonb("metadata").$type<Record<string, any>>(), // Additional metadata
 });
 
 export const insertNewsItemSchema = createInsertSchema(newsItems).omit({

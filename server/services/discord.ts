@@ -1,9 +1,11 @@
 import { Express } from "express";
 import { IStorage } from "../storage";
 import { InsertNewsItem } from "@shared/schema";
+import fetch from "node-fetch";
 
-// Discord API endpoints would normally use discord.js library
-// but we'll implement the core functionality without dependencies
+// Discord API implementation using fetch
+const DISCORD_API_URL = "https://discord.com/api/v10";
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 export function setupDiscordService(app: Express, storage: IStorage) {
   // Set up webhook for Discord events (not used here directly)
@@ -18,7 +20,71 @@ export function setupDiscordService(app: Express, storage: IStorage) {
     }
   });
 
-  // API endpoint to manually trigger a Discord sync
+  // Define Discord message type
+interface DiscordMessage {
+  id: string;
+  content: string;
+  channel_id: string;
+  author: {
+    id: string;
+    username: string;
+  };
+  timestamp: string;
+}
+
+// Helper function to fetch messages from a Discord channel
+async function fetchDiscordMessages(channelId: string, limit = 10): Promise<DiscordMessage[]> {
+  if (!DISCORD_BOT_TOKEN) {
+    throw new Error("Discord bot token is required");
+  }
+
+  try {
+    const response = await fetch(`${DISCORD_API_URL}/channels/${channelId}/messages?limit=${limit}`, {
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json() as { message?: string };
+      throw new Error(`Discord API error: ${errorData.message || response.statusText}`);
+    }
+
+    return await response.json() as DiscordMessage[];
+  } catch (error) {
+    console.error("Error fetching Discord messages:", error);
+    throw error;
+  }
+}
+
+// Helper function to convert Discord messages to news items
+function discordMessagesToNewsItems(messages: DiscordMessage[], sourceName: string): InsertNewsItem[] {
+  return messages
+    .filter(msg => msg.content && msg.content.length > 10)
+    .map(msg => {
+      // Use content as both title and content for simplicity
+      // In a real app, you might want to parse the content more intelligently
+      const content = msg.content;
+      const title = content.split('\n')[0].slice(0, 100); // First line as title, max 100 chars
+      
+      return {
+        title: title || "Discord message",
+        content: content,
+        source: `Discord: ${sourceName}`,
+        sourceType: "discord",
+        externalId: msg.id,
+        metadata: {
+          authorId: msg.author.id,
+          authorUsername: msg.author.username,
+          channelId: msg.channel_id,
+          timestamp: msg.timestamp,
+        },
+      };
+    });
+}
+
+// API endpoint to manually trigger a Discord sync
   app.post("/api/integrations/discord/sync", async (req, res) => {
     try {
       // Get active Discord integrations
@@ -38,30 +104,26 @@ export function setupDiscordService(app: Express, storage: IStorage) {
         try {
           // Extract configuration
           const channelId = integration.additionalConfig?.channelId || "708365137660215330";
-          const serverId = integration.additionalConfig?.serverId || "708365137660215327";
-
-          // In a real implementation, we would use the Discord API to fetch messages
-          // For demonstration, we'll create sample news items
-          const sampleNewsItems: InsertNewsItem[] = [
-            {
-              title: "Market Update: S&P 500 reaches new high",
-              content: "The S&P 500 reached a new all-time high today, climbing 1.2% as tech stocks led the rally amid positive earnings surprises.",
-              source: `Discord: ${integration.name}`,
-              sourceType: "discord",
-            },
-            {
-              title: "Federal Reserve maintains current interest rate",
-              content: "The Federal Reserve announced today that it will maintain the current interest rate, citing stabilization in inflation metrics and steady economic growth.",
-              source: `Discord: ${integration.name}`,
-              sourceType: "discord",
-            },
-          ];
-
+          
+          // Fetch messages from Discord using our helper function
+          console.log(`Fetching messages from Discord channel ${channelId}`);
+          const messages = await fetchDiscordMessages(channelId, 10);
+          console.log(`Fetched ${messages.length} messages from Discord`);
+          
+          // Convert Discord messages to news items
+          const newsItems = discordMessagesToNewsItems(messages, integration.name);
+          
           // Store the news items
           const createdItems = [];
-          for (const item of sampleNewsItems) {
-            const newsItem = await storage.createNewsItem(item);
-            createdItems.push(newsItem);
+          for (const item of newsItems) {
+            // Check if we already have this message by externalId
+            const existingItems = (await storage.getAllNewsItems())
+              .filter(n => n.externalId === item.externalId);
+            
+            if (existingItems.length === 0) {
+              const newsItem = await storage.createNewsItem(item);
+              createdItems.push(newsItem);
+            }
           }
 
           // Update the integration's lastSyncAt time
@@ -73,6 +135,7 @@ export function setupDiscordService(app: Express, storage: IStorage) {
             integrationId: integration.id,
             name: integration.name,
             itemsCreated: createdItems.length,
+            totalFetched: messages.length,
             success: true,
           });
         } catch (err) {
@@ -128,9 +191,10 @@ export function setupDiscordService(app: Express, storage: IStorage) {
       const content = message || `📰 **${newsItem.title}**\n\n${newsItem.content}`;
 
       // Update the shared platforms for the news item
-      if (!newsItem.sharedTo.includes("discord")) {
+      const currentSharedTo = newsItem.sharedTo || [];
+      if (!currentSharedTo.includes("discord")) {
         const updatedNewsItem = await storage.updateNewsItem(newsItem.id, {
-          sharedTo: [...newsItem.sharedTo, "discord"],
+          sharedTo: [...currentSharedTo, "discord"],
         });
       }
 
