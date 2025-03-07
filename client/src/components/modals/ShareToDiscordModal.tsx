@@ -43,11 +43,16 @@ const ShareToDiscordModal = ({ newsItem, isOpen, onClose }: ShareToDiscordModalP
     setIsSharing(true);
     try {
       // Call Discord share API
-      const response = await apiRequest({
-        url: "/api/integrations/discord/share",
-        method: "POST",
-        body: { newsId: newsItem.id, message },
-      });
+      const response = await apiRequest(
+        "/api/integrations/discord/share",
+        {
+          method: "POST",
+          body: JSON.stringify({ newsId: newsItem.id, message }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       toast({
         title: "Success",

@@ -64,11 +64,16 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
     setIsSharing(true);
     try {
       // Call Twitter share API
-      const response = await apiRequest({
-        url: "/api/integrations/twitter/share",
-        method: "POST",
-        body: { newsId: newsItem.id, message },
-      });
+      const response = await apiRequest(
+        "/api/integrations/twitter/share",
+        {
+          method: "POST",
+          body: JSON.stringify({ newsId: newsItem.id, message }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       toast({
         title: "Success",

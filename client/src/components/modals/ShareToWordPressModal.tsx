@@ -46,12 +46,12 @@ const ShareToWordPressModal = ({ newsItem, isOpen, onClose }: ShareToWordPressMo
   };
 
   // Set default content when news item changes
-  useState(() => {
+  React.useEffect(() => {
     if (newsItem) {
       setTitle(newsItem.title);
       setContent(newsItem.content);
     }
-  });
+  }, [newsItem]);
 
   const handleShare = async () => {
     if (!newsItem) return;
@@ -59,17 +59,22 @@ const ShareToWordPressModal = ({ newsItem, isOpen, onClose }: ShareToWordPressMo
     setIsSharing(true);
     try {
       // Call WordPress share API
-      const response = await apiRequest({
-        url: "/api/integrations/wordpress/share",
-        method: "POST",
-        body: { 
-          newsId: newsItem.id, 
-          title,
-          content,
-          category,
-          status
-        },
-      });
+      const response = await apiRequest(
+        "/api/integrations/wordpress/share",
+        {
+          method: "POST",
+          body: JSON.stringify({ 
+            newsId: newsItem.id, 
+            title,
+            content,
+            category,
+            status
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       toast({
         title: "Success",
