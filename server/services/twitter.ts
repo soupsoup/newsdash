@@ -119,7 +119,7 @@ function startPeriodicTwitterSync(storage: IStorage) {
           console.log(`[Periodic Sync] Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
           
           // Convert tweets to news items
-          const newsItems = scrapedTweetsToNewsItems(result.tweets, integration.name);
+          const newsItems = tweetsToNewsItems(result.tweets, integration.name);
           
           // Store new items
           let itemsCreated = 0;
@@ -312,7 +312,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           console.log(`Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
           
           // Convert tweets to news items
-          const newsItems = scrapedTweetsToNewsItems(result.tweets, integration.name);
+          const newsItems = tweetsToNewsItems(result.tweets, integration.name);
           
           // Store the news items - since we cleared the database, we can add all items
           const createdItems = [];
