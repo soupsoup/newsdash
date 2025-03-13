@@ -6,7 +6,7 @@ import NewsCard from "@/components/NewsCard";
 import { useNewsItems } from "@/hooks/useNewsItems";
 import { useToast } from "@/hooks/use-toast";
 import ShareToDiscordModal from "@/components/modals/ShareToDiscordModal";
-import ShareToTwitterModal from "@/components/modals/ShareToTwitterModal";
+import ShareToNitterModal from "@/components/modals/ShareToNitterModal";
 import ShareToWordPressModal from "@/components/modals/ShareToWordPressModal";
 import { 
   DropdownMenu,

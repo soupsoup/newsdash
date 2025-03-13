@@ -15,13 +15,13 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 
-interface ShareToTwitterModalProps {
+interface ShareToNitterModalProps {
   newsItem: NewsItem | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalProps) => {
+const ShareToNitterModal = ({ newsItem, isOpen, onClose }: ShareToNitterModalProps) => {
   const [message, setMessage] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [charCount, setCharCount] = useState(0);
@@ -36,19 +36,19 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
   // Set default message when news item changes
   React.useEffect(() => {
     if (newsItem) {
-      // Create a default tweet with truncated content if needed
+      // Create a default post with truncated content if needed
       const title = newsItem.title;
       const remainingChars = charLimit - title.length - 5; // 5 chars for spacing and ellipsis
       
-      let tweetContent = title;
+      let postContent = title;
       if (remainingChars > 30) {
         // Add some content if we have space
         const truncatedContent = newsItem.content.substring(0, remainingChars - 3) + (newsItem.content.length > remainingChars ? '...' : '');
-        tweetContent = `${title}\n\n${truncatedContent}`;
+        postContent = `${title}\n\n${truncatedContent}`;
       }
       
-      setMessage(tweetContent);
-      setCharCount(tweetContent.length);
+      setMessage(postContent);
+      setCharCount(postContent.length);
     }
   }, [newsItem, charLimit]);
 
@@ -63,10 +63,10 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
 
     setIsSharing(true);
     try {
-      // Call Twitter share API
+      // Call Nitter share API
       const response = await apiRequest(
         "POST",
-        "/api/integrations/twitter/share",
+        "/api/integrations/nitter/share",
         { newsId: newsItem.id, message }
       );
 
@@ -141,4 +141,4 @@ const ShareToTwitterModal = ({ newsItem, isOpen, onClose }: ShareToTwitterModalP
   );
 };
 
-export default ShareToTwitterModal;
+export default ShareToNitterModal;
