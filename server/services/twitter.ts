@@ -201,7 +201,12 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-1",
           publishedAt: new Date(),
           metadata: {
-            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date().toISOString()]
+            tweetId: ["fresh-" + Date.now() + "-1"] as [string, ...string[]],
+            userId: ["DeItaone"] as [string, ...string[]],
+            username: ["DeItaone"] as [string, ...string[]],
+            name: ["Walter Bloomberg"] as [string, ...string[]],
+            profileImageUrl: ["https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"] as [string, ...string[]],
+            timestamp: [new Date().toISOString()] as [string, ...string[]]
           }
         },
         {
@@ -212,7 +217,12 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-2",
           publishedAt: new Date(Date.now() - 36 * 60 * 1000), // 36 minutes ago
           metadata: {
-            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 36 * 60 * 1000).toISOString()]
+            tweetId: ["fresh-" + Date.now() + "-2"] as [string, ...string[]],
+            userId: ["DeItaone"] as [string, ...string[]],
+            username: ["DeItaone"] as [string, ...string[]],
+            name: ["Walter Bloomberg"] as [string, ...string[]],
+            profileImageUrl: ["https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"] as [string, ...string[]],
+            timestamp: [new Date(Date.now() - 36 * 60 * 1000).toISOString()] as [string, ...string[]]
           }
         },
         {
@@ -223,7 +233,12 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-3",
           publishedAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago 
           metadata: {
-            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 60 * 60 * 1000).toISOString()]
+            tweetId: ["fresh-" + Date.now() + "-3"] as [string, ...string[]],
+            userId: ["DeItaone"] as [string, ...string[]],
+            username: ["DeItaone"] as [string, ...string[]],
+            name: ["Walter Bloomberg"] as [string, ...string[]],
+            profileImageUrl: ["https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"] as [string, ...string[]],
+            timestamp: [new Date(Date.now() - 60 * 60 * 1000).toISOString()] as [string, ...string[]]
           }
         },
         {
@@ -234,7 +249,12 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-4",
           publishedAt: new Date(Date.now() - 65 * 60 * 1000), // 1 hour 5 minutes ago
           metadata: {
-            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 65 * 60 * 1000).toISOString()]
+            tweetId: ["fresh-" + Date.now() + "-4"] as [string, ...string[]],
+            userId: ["DeItaone"] as [string, ...string[]],
+            username: ["DeItaone"] as [string, ...string[]],
+            name: ["Walter Bloomberg"] as [string, ...string[]],
+            profileImageUrl: ["https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"] as [string, ...string[]],
+            timestamp: [new Date(Date.now() - 65 * 60 * 1000).toISOString()] as [string, ...string[]]
           }
         },
         {
@@ -245,7 +265,12 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-5",
           publishedAt: new Date(Date.now() - 70 * 60 * 1000), // 1 hour 10 minutes ago
           metadata: {
-            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 70 * 60 * 1000).toISOString()]
+            tweetId: ["fresh-" + Date.now() + "-5"] as [string, ...string[]],
+            userId: ["DeItaone"] as [string, ...string[]],
+            username: ["DeItaone"] as [string, ...string[]],
+            name: ["Walter Bloomberg"] as [string, ...string[]],
+            profileImageUrl: ["https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg"] as [string, ...string[]],
+            timestamp: [new Date(Date.now() - 70 * 60 * 1000).toISOString()] as [string, ...string[]]
           }
         }
       ];
