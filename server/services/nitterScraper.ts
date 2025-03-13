@@ -1,4 +1,4 @@
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import { InsertNewsItem } from '../../shared/schema';
 
@@ -36,12 +36,17 @@ export async function scrapeNitterProfile(username: string, maxTweets = 25): Pro
         const nitterUrl = `${nitterInstances[instanceIndex]}/${username}`;
         console.log(`Attempting to scrape ${nitterUrl}`);
         
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        
         const response = await fetch(nitterUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
           },
-          timeout: 10000 // 10 second timeout
+          signal: controller.signal
         });
+        
+        clearTimeout(timeout);
         
         if (response.ok) {
           html = await response.text();
@@ -70,7 +75,7 @@ export async function scrapeNitterProfile(username: string, maxTweets = 25): Pro
     const name = $('.profile-card-fullname').text().trim();
     const profileUsername = $('.profile-card-username').text().trim().replace('@', '');
     
-    tweetElements.each((_, element) => {
+    tweetElements.each((index: number, element: any) => {
       try {
         const tweetElement = $(element);
         
@@ -143,10 +148,7 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
       externalId: tweet.id,
       publishedAt,
       metadata: {
-        username: tweet.username,
-        name: tweet.name,
-        profileImageUrl: tweet.profileImageUrl,
-        timestamp: tweet.timestamp
+        tweetInfo: [tweet.username, tweet.name, tweet.profileImageUrl, tweet.timestamp]
       }
     };
   });

@@ -2,7 +2,7 @@ import { Express } from "express";
 import { IStorage } from "../storage";
 import { InsertNewsItem } from "../../shared/schema";
 import fetch from "node-fetch";
-import { scrapeTweetsFromProfile, tweetsToNewsItems as scrapedTweetsToNewsItems } from "../utils/twitterScraper";
+import { scrapeNitterProfile, tweetsToNewsItems } from "../services/nitterScraper";
 
 // Twitter/X API endpoints would use a mix of API client and web scraping
 // depending on what's available and the requirements
@@ -34,9 +34,9 @@ async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
       ? 'DeItaone' 
       : normalizedUsername;
     
-    // Use our scraper to get the tweets
-    const tweets = await scrapeTweetsFromProfile(finalUsername, limit);
-    console.log(`Fetched ${tweets.length} tweets from ${finalUsername}`);
+    // Use our Nitter scraper to get the tweets
+    const tweets = await scrapeNitterProfile(finalUsername, limit);
+    console.log(`Fetched ${tweets.length} tweets from ${finalUsername} via Nitter`);
     
     if (tweets.length > 0) {
       // Determine which scraping method was used based on the tweet ID format
