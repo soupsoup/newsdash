@@ -148,7 +148,10 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
       externalId: tweet.id,
       publishedAt,
       metadata: {
-        tweetInfo: [tweet.username, tweet.name, tweet.profileImageUrl, tweet.timestamp]
+        username: tweet.username,
+        name: tweet.name,
+        profileImageUrl: tweet.profileImageUrl,
+        timestamp: tweet.timestamp
       }
     };
   });

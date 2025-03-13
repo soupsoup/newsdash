@@ -201,7 +201,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-1",
           publishedAt: new Date(),
           metadata: {
-            username: "DeItaone",
+            username: "DeItaone", 
             name: "Walter Bloomberg",
             profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
             timestamp: new Date().toISOString()
@@ -215,10 +215,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-2",
           publishedAt: new Date(Date.now() - 36 * 60 * 1000), // 36 minutes ago
           metadata: {
-            username: "DeItaone",
-            name: "Walter Bloomberg",
-            profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
-            timestamp: new Date(Date.now() - 36 * 60 * 1000).toISOString()
+            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 36 * 60 * 1000).toISOString()]
           }
         },
         {
@@ -229,10 +226,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-3",
           publishedAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago 
           metadata: {
-            username: "DeItaone",
-            name: "Walter Bloomberg",
-            profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
-            timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString()
+            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 60 * 60 * 1000).toISOString()]
           }
         },
         {
@@ -243,10 +237,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-4",
           publishedAt: new Date(Date.now() - 65 * 60 * 1000), // 1 hour 5 minutes ago
           metadata: {
-            username: "DeItaone",
-            name: "Walter Bloomberg",
-            profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
-            timestamp: new Date(Date.now() - 65 * 60 * 1000).toISOString()
+            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 65 * 60 * 1000).toISOString()]
           }
         },
         {
@@ -257,10 +248,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
           externalId: "fresh-" + Date.now() + "-5",
           publishedAt: new Date(Date.now() - 70 * 60 * 1000), // 1 hour 10 minutes ago
           metadata: {
-            username: "DeItaone",
-            name: "Walter Bloomberg",
-            profileImageUrl: "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg",
-            timestamp: new Date(Date.now() - 70 * 60 * 1000).toISOString()
+            tweetInfo: ["DeItaone", "Walter Bloomberg", "https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg", new Date(Date.now() - 70 * 60 * 1000).toISOString()]
           }
         }
       ];
