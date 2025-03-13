@@ -1001,20 +1001,20 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
       publishedAt = new Date();
     }
     
-    // Format metadata
-    const metadata: Record<string, any> = {
-      tweetId: tweet.id,
-      userId: tweet.user.id,
-      username: tweet.user.username,
-      timestamp: tweet.created_at,
-      profileImageUrl: tweet.user.profile_image_url
+    // Format metadata using array-based format required by schema
+    const metadata: { [key: string]: [any, ...any[]] } = {
+      tweetId: [tweet.id],
+      userId: [tweet.user.id],
+      username: [tweet.user.username],
+      timestamp: [tweet.created_at],
+      profileImageUrl: [tweet.user.profile_image_url]
     };
     
     return {
       title: tweet.text,
       content: tweet.text,
-      source: sourceName.startsWith("X/Twitter:") ? sourceName : `X/Twitter: ${sourceName}`,
-      sourceType: "twitter",
+      source: sourceName.startsWith("Nitter:") ? sourceName : `Nitter: ${sourceName}`,
+      sourceType: "nitter",
       externalId: tweet.id,
       metadata,
       publishedAt, // Include the parsed date

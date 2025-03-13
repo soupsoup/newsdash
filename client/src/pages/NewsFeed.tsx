@@ -191,7 +191,7 @@ const NewsFeed = () => {
                     }}
                   >
                     <span className="material-icons text-[#1DA1F2] mr-2">flutter_dash</span> 
-                    <span>Share to Twitter/X</span>
+                    <span>Share to Nitter</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="flex items-center cursor-pointer"
@@ -227,7 +227,7 @@ const NewsFeed = () => {
         newsItem={selectedNewsItem}
       />
       
-      <ShareToTwitterModal
+      <ShareToNitterModal
         isOpen={isTwitterModalOpen}
         onClose={() => setIsTwitterModalOpen(false)}
         newsItem={selectedNewsItem}
