@@ -1003,11 +1003,11 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
     
     // Format metadata using array-based format required by schema
     const metadata: { [key: string]: [any, ...any[]] } = {
-      tweetId: [tweet.id],
-      userId: [tweet.user.id],
-      username: [tweet.user.username],
-      timestamp: [tweet.created_at],
-      profileImageUrl: [tweet.user.profile_image_url]
+      tweetId: [tweet.id] as [string, ...string[]],
+      userId: [tweet.user.id] as [string, ...string[]],
+      username: [tweet.user.username] as [string, ...string[]],
+      timestamp: [tweet.created_at] as [string, ...string[]],
+      profileImageUrl: [tweet.user.profile_image_url] as [string, ...string[]]
     };
     
     return {

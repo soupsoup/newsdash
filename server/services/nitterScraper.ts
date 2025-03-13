@@ -143,12 +143,16 @@ export function tweetsToNewsItems(tweets: ScrapedTweet[], sourceName: string): I
     return {
       title: tweet.text.split('\n')[0].substring(0, 100), // First line of the tweet, max 100 chars
       content: tweet.text,
-      source: sourceName,
-      sourceType: 'twitter',
+      source: sourceName.startsWith("Nitter:") ? sourceName : `Nitter: ${sourceName}`,
+      sourceType: 'nitter',
       externalId: tweet.id,
       publishedAt,
       metadata: {
-        tweetInfo: [tweet.username, tweet.name, tweet.profileImageUrl, tweet.timestamp]
+        tweetId: [tweet.id] as [string, ...string[]],
+        username: [tweet.username] as [string, ...string[]],
+        name: [tweet.name] as [string, ...string[]],
+        profileImageUrl: [tweet.profileImageUrl] as [string, ...string[]],
+        timestamp: [tweet.timestamp] as [string, ...string[]]
       }
     };
   });
