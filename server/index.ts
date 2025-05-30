@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { checkDatabaseConnection } from './db'; // adjust path if needed
 
 const app = express();
 app.use(express.json());
@@ -36,6 +37,21 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/api/test-supabase', async (req, res) => {
+  try {
+    const result = await checkDatabaseConnection();
+    res.json({ success: result });
+  } catch (error) {
+    let message = 'Unknown error';
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'object' && error !== null && 'message' in error) {
+      message = (error as any).message;
+    }
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -56,7 +72,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = process.env.PORT || 5000;
+  const port = process.env.PORT || 5050;
   server.listen(port, () => {
     log(`Server running at http://localhost:${port}`);
   });
