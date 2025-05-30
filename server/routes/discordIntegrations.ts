@@ -1,4 +1,6 @@
 import express from "express";
+import { scrapeNitterProfile, tweetsToNewsItems } from '../services/nitterScraper';
+import { storage } from '../storage';
 
 export interface DiscordIntegration {
   id: number;
@@ -65,6 +67,30 @@ router.delete("/api/discord-integrations/:id", (req, res) => {
   const id = Number(req.params.id);
   integrations = integrations.filter(i => i.id !== id);
   res.status(204).send();
+});
+
+// Manual Nitter sync endpoint
+router.post('/api/integrations/nitter/sync', async (req, res) => {
+  try {
+    const { username = 'DeItaone', maxTweets = 25 } = req.body || {};
+    const tweets = await scrapeNitterProfile(username, maxTweets);
+    if (!tweets.length) {
+      return res.status(404).json({ success: false, message: 'No tweets found.' });
+    }
+    // Convert tweets to news items
+    const newsItems = tweetsToNewsItems(tweets, username);
+    // Store news items in the database
+    const created = [];
+    for (const item of newsItems) {
+      const result = await storage.createNewsItem(item);
+      created.push(result);
+    }
+    res.json({ success: true, count: created.length, items: created });
+  } catch (error) {
+    console.error('Manual Nitter sync error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, message: 'Failed to sync Nitter updates', error: errorMessage });
+  }
 });
 
 export default router; 
