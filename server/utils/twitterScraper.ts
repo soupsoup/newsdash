@@ -192,14 +192,8 @@ async function fetchFromNitter(username: string, maxTweets: number): Promise<Scr
       $('item').each((_, item) => {
         const $item = $(item);
         const tweetText = $item.find('title').text();
-        
-        if (username.toLowerCase() === 'deitaone' && !isFinancialTweet(tweetText)) {
-          return;
-        }
-        
         const link = $item.find('link').text();
         const tweetId = link.match(/status\/(\d+)/)?.[1] || `nitter-${Date.now()}-${tweets.length}`;
-        
         tweets.push({
           id: tweetId,
           text: tweetText,
@@ -211,7 +205,6 @@ async function fetchFromNitter(username: string, maxTweets: number): Promise<Scr
             profile_image_url: 'https://pbs.twimg.com/profile_images/1578454393750843392/BaDx7NAZ_400x400.jpg'
           }
         });
-        
         if (tweets.length >= maxTweets) return false;
       });
       
