@@ -21,6 +21,7 @@ const NewsFeed = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSource, setFilterSource] = useState("all");
+  const [pullingNitter, setPullingNitter] = useState(false);
   
   // State for sharing modals
   const [selectedNewsItem, setSelectedNewsItem] = useState<NewsItem | null>(null);
@@ -57,6 +58,39 @@ const NewsFeed = () => {
       title: "Refreshing",
       description: "Fetching latest news items",
     });
+  };
+
+  const handlePullNitter = async () => {
+    setPullingNitter(true);
+    try {
+      const res = await fetch("/api/integrations/nitter/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "DeItaone", maxTweets: 25 })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({
+          title: "Nitter Sync Complete",
+          description: `Pulled ${data.count} new tweets from Nitter.`
+        });
+        refetchNewsItems();
+      } else {
+        toast({
+          title: "Nitter Sync Failed",
+          description: data.message || "No new tweets found.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Nitter Sync Error",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive"
+      });
+    } finally {
+      setPullingNitter(false);
+    }
   };
 
   // Sort and filter news items
@@ -100,9 +134,19 @@ const NewsFeed = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#212121]">News Feed</h1>
-        <p className="text-[#757575]">View and manage all news items from your sources</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#212121]">News Feed</h1>
+          <p className="text-[#757575]">View and manage all news items from your sources</p>
+        </div>
+        <Button
+          className="bg-[#1DA1F2] text-white hover:bg-[#1976d2] w-full sm:w-auto"
+          onClick={handlePullNitter}
+          disabled={pullingNitter}
+        >
+          <span className="material-icons text-sm mr-1">cloud_download</span>
+          {pullingNitter ? "Pulling Nitter Updates..." : "Pull Nitter Updates"}
+        </Button>
       </div>
 
       {/* Filters and Actions */}
