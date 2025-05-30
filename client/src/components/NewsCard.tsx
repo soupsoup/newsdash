@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { NewsItem } from "@shared/schema";
+import { NewsItem } from '@shared/schema';
 
 interface NewsCardProps {
   news: NewsItem;

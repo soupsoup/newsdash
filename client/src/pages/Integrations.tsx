@@ -7,7 +7,7 @@ import { useIntegration } from "@/contexts/IntegrationContext";
 import { useToast } from "@/hooks/use-toast";
 import AddIntegrationModal from "@/components/modals/AddIntegrationModal";
 import EditIntegrationModal from "@/components/modals/EditIntegrationModal";
-import { Integration } from "@shared/schema";
+import { Integration } from '../../../shared/schema';
 
 const Integrations = () => {
   const { integrations, updateIntegration, deleteIntegration } = useIntegration();

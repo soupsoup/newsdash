@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useToast } from "@/hooks/use-toast";
-import { Integration } from "@shared/schema";
+import { Integration } from '@shared/schema';
 
 interface EditIntegrationModalProps {
   integration: Integration | null;

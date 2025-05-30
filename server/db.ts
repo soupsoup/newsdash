@@ -1,36 +1,55 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as schema from '../shared/schema';
+import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.SUPABASE_DATABASE_URL) {
-  throw new Error('SUPABASE_DATABASE_URL is required');
-}
-
 // Create the connection
-const connectionString = process.env.SUPABASE_DATABASE_URL;
-const client = postgres(connectionString, {
+console.log('Attempting to connect to database...');
+
+const pool = new Pool({
+  host: 'gondola.proxy.rlwy.net',
+  port: 34773,
+  database: 'railway',
+  user: 'postgres',
+  password: 'UMpKhseolcQxKUWKikPjjZdXYPWDqwuh',
   ssl: {
     rejectUnauthorized: false
-  },
-  max: 1,
-  idle_timeout: 20,
-  connect_timeout: 30,
-  prepare: false
+  }
 });
 
-export const db = drizzle(client, { schema });
+// Add error handler to the pool
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
 
 // Export a function to check the database connection
 export async function checkDatabaseConnection() {
+  let client;
   try {
-    await client`SELECT 1`;
+    console.log('Testing database connection...');
+    client = await pool.connect();
+    console.log('Got client from pool, executing test query...');
+    const result = await client.query('SELECT NOW()');
+    console.log('Query result:', result.rows[0].now);
     console.log('Database connection successful');
     return true;
   } catch (error) {
     console.error('Database connection failed:', error);
-    return false;
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    }
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
-} 
+}
+
+// Export the pool for direct use
+export { pool }; 

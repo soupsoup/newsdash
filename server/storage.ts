@@ -1,4 +1,4 @@
-import { InsertUser, User, NewsItem, InsertNewsItem, Integration, InsertIntegration } from "@shared/schema";
+import { InsertUser, User, NewsItem, InsertNewsItem, Integration, InsertIntegration } from '../shared/schema';
 
 // Interface for storage operations
 export interface IStorage {

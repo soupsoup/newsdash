@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Integration, InsertIntegration } from "@shared/schema";
+import { Integration, InsertIntegration } from '@shared/schema';
 import { queryClient } from "@/lib/queryClient";
 
 interface IntegrationContextType {

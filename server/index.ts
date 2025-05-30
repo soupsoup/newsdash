@@ -1,11 +1,23 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import { checkDatabaseConnection } from './db';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { checkDatabaseConnection } from './db'; // adjust path if needed
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
+const port = process.env.PORT || 5052;
+
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Serve static files from the dist/public directory
+app.use(express.static(path.join(__dirname, '../dist/public')));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,19 +49,19 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/test-supabase', async (req, res) => {
-  try {
-    const result = await checkDatabaseConnection();
-    res.json({ success: result });
-  } catch (error) {
-    let message = 'Unknown error';
-    if (error instanceof Error) {
-      message = error.message;
-    } else if (typeof error === 'object' && error !== null && 'message' in error) {
-      message = (error as any).message;
-    }
-    res.status(500).json({ success: false, error: message });
+// API routes
+app.get('/api/test-db', async (req, res) => {
+  const result = await checkDatabaseConnection();
+  if (result === true) {
+    res.json({ success: true });
+  } else {
+    res.status(500).json({ success: false, error: result });
   }
+});
+
+// Serve the client-side app for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/public/index.html'));
 });
 
 (async () => {
@@ -72,7 +84,6 @@ app.get('/api/test-supabase', async (req, res) => {
     serveStatic(app);
   }
 
-  const port = process.env.PORT || 5050;
   server.listen(port, () => {
     log(`Server running at http://localhost:${port}`);
   });

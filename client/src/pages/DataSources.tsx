@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Integration } from "@shared/schema";
+import { Integration } from '@shared/schema';
 
 const DataSources = () => {
   const { integrations, updateIntegration, refreshIntegrations } = useIntegration();

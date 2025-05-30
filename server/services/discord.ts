@@ -1,6 +1,6 @@
 import { Express } from "express";
 import { IStorage } from "../storage";
-import { InsertNewsItem } from "@shared/schema";
+import { InsertNewsItem } from '../shared/schema';
 import fetch from "node-fetch";
 
 // Discord API implementation using fetch

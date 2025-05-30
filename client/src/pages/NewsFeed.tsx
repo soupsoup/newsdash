@@ -14,7 +14,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { NewsItem } from "@shared/schema";
+import { NewsItem } from '@shared/schema';
 
 const NewsFeed = () => {
   const { newsItems, isLoading, refetchNewsItems } = useNewsItems();
