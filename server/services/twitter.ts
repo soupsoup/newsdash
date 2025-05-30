@@ -1,4 +1,4 @@
-import { Express } from "express";
+import { Express, Request, Response } from "express";
 import { IStorage } from "../storage";
 import { InsertNewsItem } from "../../shared/schema";
 import fetch from "node-fetch";
@@ -78,8 +78,10 @@ async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
 
 // Function to periodically check for new tweets
 function startPeriodicTwitterSync(storage: IStorage) {
-  // Check for new tweets every 15 minutes
-  const SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
+  // Check for new tweets every 30 minutes instead of 15
+  const SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5 * 60 * 1000; // 5 minutes
 
   setInterval(async () => {
     try {
@@ -95,60 +97,66 @@ function startPeriodicTwitterSync(storage: IStorage) {
 
       // Process each active Twitter integration
       for (const integration of activeIntegrations) {
-        try {
-          // Extract configuration
-          const config = integration.additionalConfig as Record<string, unknown> || {};
-          const username = (config.username as string) || "DeItaone";
-          
-          // Fetch tweets using our scraper with increased limit for better detection of financial tweets
-          console.log(`[Periodic Sync] Fetching tweets from ${username}`);
-          const result = await fetchTweetsFromUser(username, 25);
-          
-          // Check if we got any tweets
-          if (!result.success || result.tweets.length === 0) {
-            // Update the integration to show it's having issues
+        let retryCount = 0;
+        let success = false;
+
+        while (retryCount < MAX_RETRIES && !success) {
+          try {
+            // Extract configuration
+            const config = integration.additionalConfig as Record<string, unknown> || {};
+            const username = (config.username as string) || "DeItaone";
+            
+            // Fetch tweets using our scraper with increased limit for better detection of financial tweets
+            console.log(`[Periodic Sync] Fetching tweets from ${username} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            const result = await fetchTweetsFromUser(username, 25);
+            
+            // Check if we got any tweets
+            if (!result.success || result.tweets.length === 0) {
+              throw new Error(result.error || 'No tweets retrieved');
+            }
+            
+            console.log(`[Periodic Sync] Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
+            
+            // Convert tweets to news items
+            const newsItems = tweetsToNewsItems(result.tweets, integration.name);
+            
+            // Store new items
+            let itemsCreated = 0;
+            for (const item of newsItems) {
+              // Check if we already have this tweet by externalId
+              const existingItems = (await storage.getAllNewsItems())
+                .filter(n => n.externalId === item.externalId);
+              
+              if (existingItems.length === 0) {
+                await storage.createNewsItem(item);
+                itemsCreated++;
+              }
+            }
+
+            // Update the integration's lastSyncAt time and status
             await storage.updateIntegration(integration.id, {
-              status: "error",
-              lastSyncAt: new Date()
+              lastSyncAt: new Date(),
+              status: "connected"
             });
+
+            console.log(`[Periodic Sync] Completed Twitter sync for integration ${integration.id}, created ${itemsCreated} new items`);
+            success = true;
+          } catch (err) {
+            console.error(`[Periodic Sync] Twitter sync error for integration ${integration.id} (attempt ${retryCount + 1}/${MAX_RETRIES}):`, err);
             
-            console.log(`[Periodic Sync] Failed to retrieve tweets from @${username}: ${result.error || 'Unknown error'}. No mock data will be used.`);
-            continue;
-          }
-          
-          console.log(`[Periodic Sync] Fetched ${result.tweets.length} tweets from ${username} via ${result.scrapingMethod}`);
-          
-          // Convert tweets to news items
-          const newsItems = tweetsToNewsItems(result.tweets, integration.name);
-          
-          // Store new items
-          let itemsCreated = 0;
-          for (const item of newsItems) {
-            // Check if we already have this tweet by externalId
-            const existingItems = (await storage.getAllNewsItems())
-              .filter(n => n.externalId === item.externalId);
+            retryCount++;
             
-            if (existingItems.length === 0) {
-              await storage.createNewsItem(item);
-              itemsCreated++;
+            if (retryCount < MAX_RETRIES) {
+              console.log(`[Periodic Sync] Retrying in ${RETRY_DELAY/1000/60} minutes...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            } else {
+              // Update the integration to show it's having issues after all retries failed
+              await storage.updateIntegration(integration.id, {
+                status: "error",
+                lastSyncAt: new Date()
+              });
             }
           }
-
-          // Update the integration's lastSyncAt time and status
-          await storage.updateIntegration(integration.id, {
-            lastSyncAt: new Date(),
-            status: "connected"
-          });
-
-          console.log(`[Periodic Sync] Completed Twitter sync for integration ${integration.id}, created ${itemsCreated} new items`);
-        } catch (err) {
-          console.error(`[Periodic Sync] Twitter sync error for integration ${integration.id}:`, err);
-          
-          // Update the integration to show it's having issues
-          await storage.updateIntegration(integration.id, {
-            status: "error",
-            lastSyncAt: new Date()
-          });
         }
       }
     } catch (error) {
@@ -159,7 +167,7 @@ function startPeriodicTwitterSync(storage: IStorage) {
 
 export function setupTwitterService(app: Express, storage: IStorage) {
   // API endpoint to manually trigger a Twitter sync for DeItaone
-  app.post("/api/integrations/twitter/sync", async (req, res) => {
+  app.post("/api/integrations/twitter/sync", async (req: Request, res: Response) => {
     try {
       console.log("Twitter sync manually triggered");
       
@@ -405,7 +413,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   });
 
   // API endpoint to check if we can access a user's tweets
-  app.post("/api/integrations/twitter/check-account", async (req, res) => {
+  app.post("/api/integrations/twitter/check-account", async (req: Request, res: Response) => {
     try {
       const { username } = req.body;
       
@@ -453,7 +461,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   // Start periodic sync if enabled
   startPeriodicTwitterSync(storage);
   // API endpoint to share news to Twitter/X
-  app.post("/api/integrations/twitter/share", async (req, res) => {
+  app.post("/api/integrations/twitter/share", async (req: Request, res: Response) => {
     try {
       const { newsId, message } = req.body;
 
@@ -503,7 +511,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   });
 
   // Endpoint to test Twitter API connection
-  app.post("/api/integrations/twitter/test", async (req, res) => {
+  app.post("/api/integrations/twitter/test", async (req: Request, res: Response) => {
     try {
       const { apiKey, apiSecret, accessToken, refreshToken } = req.body;
 
@@ -532,7 +540,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   });
 
   // API endpoint to get Twitter user profile information
-  app.get("/api/integrations/twitter/profile", async (req, res) => {
+  app.get("/api/integrations/twitter/profile", async (req: Request, res: Response) => {
     try {
       // Get active Twitter integrations
       const twitterIntegrations = await storage.getIntegrationsByType("twitter");
@@ -561,7 +569,7 @@ export function setupTwitterService(app: Express, storage: IStorage) {
   });
 
   // API endpoint to get Twitter analytics
-  app.get("/api/integrations/twitter/analytics", async (req, res) => {
+  app.get("/api/integrations/twitter/analytics", async (req: Request, res: Response) => {
     try {
       const { since } = req.query;
       const sinceDate = since ? new Date(since as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to 30 days

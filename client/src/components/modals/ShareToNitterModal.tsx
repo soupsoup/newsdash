@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ShareToNitterModalProps {
   newsItem: NewsItem | null;
@@ -25,11 +26,13 @@ const ShareToNitterModal = ({ newsItem, isOpen, onClose }: ShareToNitterModalPro
   const [message, setMessage] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const [charCount, setCharCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const charLimit = 280;
 
   const handleClose = () => {
     setMessage("");
+    setError(null);
     onClose();
   };
 
@@ -56,12 +59,14 @@ const ShareToNitterModal = ({ newsItem, isOpen, onClose }: ShareToNitterModalPro
     const newMessage = e.target.value;
     setMessage(newMessage);
     setCharCount(newMessage.length);
+    setError(null); // Clear any previous errors when user types
   };
 
   const handleShare = async () => {
     if (!newsItem) return;
 
     setIsSharing(true);
+    setError(null);
     try {
       // Call Nitter share API
       const response = await apiRequest(
@@ -70,20 +75,37 @@ const ShareToNitterModal = ({ newsItem, isOpen, onClose }: ShareToNitterModalPro
         { newsId: newsItem.id, message }
       );
 
-      toast({
-        title: "Success",
-        description: "News item shared to Nitter successfully",
-      });
+      const data = await response.json();
 
-      // Invalidate news cache to reflect updated share status
-      queryClient.invalidateQueries({ queryKey: ['/api/news'] });
-      
-      handleClose();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to share to Nitter');
+      }
+
+      if (data.status === 'success') {
+        toast({
+          title: "Success",
+          description: "News item shared to Nitter successfully",
+        });
+
+        // Invalidate news cache to reflect updated share status
+        queryClient.invalidateQueries({ queryKey: ['/api/news'] });
+        
+        handleClose();
+      } else if (data.status === 'error') {
+        setError(data.error || 'Failed to share to Nitter');
+        toast({
+          title: "Error",
+          description: data.error || "Failed to share to Nitter. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Nitter share error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to share to Nitter';
+      setError(errorMessage);
       toast({
         title: "Error",
-        description: "Failed to share to Nitter. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -102,6 +124,12 @@ const ShareToNitterModal = ({ newsItem, isOpen, onClose }: ShareToNitterModalPro
         </DialogHeader>
 
         <div className="py-4">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <Textarea
             value={message}
             onChange={handleMessageChange}

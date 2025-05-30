@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import { InsertNewsItem } from '../../shared/schema';
+import https from 'https';
+import { Rettiwt } from 'rettiwt-api';
 
 interface ScrapedTweet {
   id: string;
@@ -11,6 +13,87 @@ interface ScrapedTweet {
   profileImageUrl: string;
 }
 
+// Cache for storing successful Nitter instances
+const nitterInstanceCache = new Map<string, {
+  lastSuccess: number;
+  failureCount: number;
+}>();
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+const requestCounts = new Map<string, number[]>();
+
+// Create a custom HTTPS agent that ignores SSL certificate errors
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false
+});
+
+/**
+ * Checks if we're rate limited for a given instance
+ */
+function isRateLimited(instance: string): boolean {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW;
+  
+  // Get request timestamps for this instance
+  const requests = requestCounts.get(instance) || [];
+  
+  // Remove old requests outside the window
+  const recentRequests = requests.filter(timestamp => timestamp > windowStart);
+  requestCounts.set(instance, recentRequests);
+  
+  // Check if we've exceeded the rate limit
+  return recentRequests.length >= MAX_REQUESTS_PER_WINDOW;
+}
+
+/**
+ * Records a request for rate limiting
+ */
+function recordRequest(instance: string) {
+  const requests = requestCounts.get(instance) || [];
+  requests.push(Date.now());
+  requestCounts.set(instance, requests);
+}
+
+/**
+ * Gets the best Nitter instance to use based on past performance
+ */
+function getBestNitterInstance(): string {
+  // Updated list of more reliable Nitter instances
+  const instances = [
+    'https://nitter.net',
+    'https://nitter.privacydev.net',
+    'https://nitter.unixfox.eu',
+    'https://nitter.42l.fr',
+    'https://nitter.poast.org',
+    'https://nitter.1d4.us',
+    'https://nitter.kavin.rocks',
+    'https://nitter.moomoo.me',
+    'https://nitter.woodland.cafe',
+    'https://nitter.weiler.rocks',
+    'https://nitter.13ad.de',
+    'https://nitter.pussthecat.org',
+    'https://nitter.nixnet.services',
+    'https://nitter.fdn.fr',
+    'https://nitter.40two.app'
+  ];
+
+  // Sort instances by success rate and recency
+  return instances.sort((a, b) => {
+    const aStats = nitterInstanceCache.get(a) || { lastSuccess: 0, failureCount: 0 };
+    const bStats = nitterInstanceCache.get(b) || { lastSuccess: 0, failureCount: 0 };
+    
+    // Prefer instances with fewer failures
+    if (aStats.failureCount !== bStats.failureCount) {
+      return aStats.failureCount - bStats.failureCount;
+    }
+    
+    // Then prefer more recently successful instances
+    return bStats.lastSuccess - aStats.lastSuccess;
+  })[0];
+}
+
 /**
  * Scrapes tweets from a Nitter profile
  * @param username The Twitter/X username to scrape (without @)
@@ -19,30 +102,37 @@ interface ScrapedTweet {
  */
 export async function scrapeNitterProfile(username: string, maxTweets = 25): Promise<ScrapedTweet[]> {
   try {
-    // Try multiple Nitter instances since they can be unstable
-    const nitterInstances = [
-      'https://nitter.net',
-      'https://nitter.poast.org',
-      'https://nitter.1d4.us',
-      'https://nitter.kavin.rocks'
-    ];
-    
     let html = '';
-    let instanceIndex = 0;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 5; // Increased from 3 to 5
     
-    // Try each instance until one works
-    while (instanceIndex < nitterInstances.length) {
+    while (attempts < MAX_ATTEMPTS) {
+      const instance = getBestNitterInstance();
+      
+      if (isRateLimited(instance)) {
+        console.log(`Rate limited on ${instance}, waiting...`);
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_WINDOW));
+        continue;
+      }
+      
       try {
-        const nitterUrl = `${nitterInstances[instanceIndex]}/${username}`;
-        console.log(`Attempting to scrape ${nitterUrl}`);
+        const nitterUrl = `${instance}/${username}`;
+        console.log(`Attempting to scrape ${nitterUrl} (attempt ${attempts + 1}/${MAX_ATTEMPTS})`);
         
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeout = setTimeout(() => controller.abort(), 20000); // Increased timeout to 20 seconds
+        
+        recordRequest(instance);
         
         const response = await fetch(nitterUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           },
+          agent: httpsAgent, // Use custom HTTPS agent
           signal: controller.signal
         });
         
@@ -50,17 +140,75 @@ export async function scrapeNitterProfile(username: string, maxTweets = 25): Pro
         
         if (response.ok) {
           html = await response.text();
+          // Update instance cache with success
+          nitterInstanceCache.set(instance, {
+            lastSuccess: Date.now(),
+            failureCount: 0
+          });
           break;
+        } else if (response.status === 429) {
+          console.log(`Rate limited by ${instance}, updating cache...`);
+          const stats = nitterInstanceCache.get(instance) || { lastSuccess: 0, failureCount: 0 };
+          nitterInstanceCache.set(instance, {
+            ...stats,
+            failureCount: stats.failureCount + 1
+          });
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
+        } else {
+          console.error(`Error with Nitter instance ${instance}: ${response.status} ${response.statusText}`);
+          const stats = nitterInstanceCache.get(instance) || { lastSuccess: 0, failureCount: 0 };
+          nitterInstanceCache.set(instance, {
+            ...stats,
+            failureCount: stats.failureCount + 1
+          });
         }
       } catch (error) {
-        console.error(`Error with Nitter instance ${nitterInstances[instanceIndex]}:`, error);
+        console.error(`Error with Nitter instance:`, error);
+        const stats = nitterInstanceCache.get(instance) || { lastSuccess: 0, failureCount: 0 };
+        nitterInstanceCache.set(instance, {
+          ...stats,
+          failureCount: stats.failureCount + 1
+        });
       }
       
-      instanceIndex++;
+      attempts++;
+      if (attempts < MAX_ATTEMPTS) {
+        // Exponential backoff: 2s, 4s, 8s, 16s
+        const backoffTime = Math.min(2000 * Math.pow(2, attempts - 1), 16000);
+        console.log(`Waiting ${backoffTime/1000} seconds before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
+      }
     }
     
     if (!html) {
-      throw new Error('All Nitter instances failed to respond');
+      // Fallback: Try Rettiwt-API
+      console.warn('All Nitter instances failed. Trying Rettiwt-API fallback...');
+      try {
+        const rettiwt = new Rettiwt();
+        // Get user details to extract numeric user ID
+        const user = await rettiwt.user.details(username);
+        const userId = user?.id;
+        if (!userId) throw new Error('Could not resolve user ID from username');
+        const timeline = await rettiwt.user.timeline(userId, maxTweets);
+        if (!timeline || !timeline.list || !timeline.list.length) {
+          throw new Error('Rettiwt-API returned no tweets');
+        }
+        // Map Rettiwt tweet format to ScrapedTweet
+        const tweets: ScrapedTweet[] = timeline.list.map((tweet: any) => ({
+          id: tweet.id,
+          text: tweet.fullText || tweet.text || '',
+          timestamp: tweet.createdAt,
+          username: tweet.user?.userName || username,
+          name: tweet.user?.fullName || username,
+          profileImageUrl: tweet.user?.profileImage || ''
+        })).filter((t: any) => t.id && t.text);
+        if (!tweets.length) throw new Error('Rettiwt-API returned no valid tweets');
+        console.log(`Successfully scraped ${tweets.length} tweets from ${username} using Rettiwt-API fallback`);
+        return tweets;
+      } catch (rettiwtError) {
+        console.error('Rettiwt-API fallback failed:', rettiwtError);
+        throw new Error('All Nitter instances and Rettiwt-API fallback failed');
+      }
     }
     
     // Parse the HTML with cheerio
