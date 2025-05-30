@@ -28,6 +28,7 @@ const NewsFeed = () => {
   const [isDiscordModalOpen, setIsDiscordModalOpen] = useState(false);
   const [isTwitterModalOpen, setIsTwitterModalOpen] = useState(false);
   const [isWordPressModalOpen, setIsWordPressModalOpen] = useState(false);
+  const [openShareDropdownId, setOpenShareDropdownId] = useState<number | null>(null);
 
   const handleShareNews = (newsId: number) => {
     // Find the news item
@@ -202,18 +203,18 @@ const NewsFeed = () => {
             <div key={news.id} className="relative">
               <NewsCard 
                 news={news} 
-                onShare={handleShareNews}
+                onShare={() => setOpenShareDropdownId(news.id)}
                 onEdit={handleEditNews}
               />
-              {/* Hidden dropdown trigger for share platforms */}
-              <DropdownMenu>
+              <DropdownMenu open={openShareDropdownId === news.id} onOpenChange={(open) => setOpenShareDropdownId(open ? news.id : null)}>
                 <DropdownMenuTrigger asChild>
-                  <button 
-                    id={`share-dropdown-${news.id}`} 
-                    className="hidden"
+                  <Button
+                    variant="outline"
+                    className="absolute top-2 right-2 z-10 flex items-center gap-1"
                   >
+                    <span className="material-icons text-sm">share</span>
                     Share
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[200px]">
                   <DropdownMenuItem 
@@ -221,6 +222,7 @@ const NewsFeed = () => {
                     onClick={() => {
                       setSelectedNewsItem(news);
                       setIsDiscordModalOpen(true);
+                      setOpenShareDropdownId(null);
                     }}
                   >
                     <span className="material-icons text-[#5865F2] mr-2">discord</span> 
@@ -231,6 +233,7 @@ const NewsFeed = () => {
                     onClick={() => {
                       setSelectedNewsItem(news);
                       setIsTwitterModalOpen(true);
+                      setOpenShareDropdownId(null);
                     }}
                   >
                     <span className="material-icons text-[#1DA1F2] mr-2">flutter_dash</span> 
@@ -241,6 +244,7 @@ const NewsFeed = () => {
                     onClick={() => {
                       setSelectedNewsItem(news);
                       setIsWordPressModalOpen(true);
+                      setOpenShareDropdownId(null);
                     }}
                   >
                     <span className="material-icons text-[#21759b] mr-2">wordpress</span> 
