@@ -12,6 +12,7 @@ import Settings from "@/pages/Settings";
 import MainLayout from "@/layouts/MainLayout";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { IntegrationProvider } from "@/contexts/IntegrationContext";
+import DiscordIntegrationsPage from "@/pages/DiscordIntegrations";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/integrations" component={Integrations} />
       <Route path="/data-sources" component={DataSources} />
       <Route path="/settings" component={Settings} />
+      <Route path="/discord-integrations" component={DiscordIntegrationsPage} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
