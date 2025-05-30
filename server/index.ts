@@ -1,3 +1,4 @@
+console.log('Starting server/index.ts...');
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { checkDatabaseConnection } from './db';
