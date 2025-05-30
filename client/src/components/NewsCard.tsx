@@ -115,6 +115,9 @@ const NewsCard = ({ news, onShare, onEdit }: NewsCardProps) => {
         </div>
         
         <h3 className="font-medium text-[#212121] mb-2">{news.title}</h3>
+        <div className="text-xs text-gray-500 mb-2">
+          {new Date(news.publishedAt).toLocaleString()}
+        </div>
         
         <p className="text-[#757575] text-sm mb-4">
           {news.content}

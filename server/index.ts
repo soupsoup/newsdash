@@ -7,6 +7,7 @@ import { dirname } from 'path';
 import { checkDatabaseConnection } from './db';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import discordIntegrationsRouter from './routes/discordIntegrations';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,8 +16,7 @@ const app = express();
 const port = process.env.PORT || 5052;
 
 app.use(cors());
-// Serve static files from the dist/public directory
-app.use(express.static(path.join(__dirname, '../dist/public')));
+app.use(express.json());
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -58,6 +58,17 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
+// Test JSON body parsing
+app.post('/api/test-json', (req, res) => {
+  res.json({ body: req.body });
+});
+
+app.post('/test-json', (req, res) => {
+  res.json({ body: req.body });
+});
+
+app.use(discordIntegrationsRouter);
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -68,6 +79,9 @@ app.get('/api/test-db', async (req, res) => {
     res.status(status).json({ message });
     throw err;
   });
+
+  // Serve static files from the dist/public directory (moved below API routes)
+  app.use(express.static(path.join(__dirname, '../dist/public')));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

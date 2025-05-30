@@ -22,37 +22,23 @@ async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
   tips?: string[]
 }> {
   try {
-    console.log(`Fetching tweets from ${username}`);
-    
+    console.log(`Fetching tweets from ${username} using Nitter only`);
     // Normalize the username (X.com and Twitter.com usernames may have @ symbols)
     const normalizedUsername = username.startsWith('@') 
       ? username.substring(1) 
       : username;
-      
     // Handle common username variations for DeItaone
     const finalUsername = normalizedUsername.toLowerCase() === 'deltaone' 
       ? 'DeItaone' 
       : normalizedUsername;
-    
-    // Use our Nitter scraper to get the tweets
+    // Use only Nitter scraper to get the tweets
     const tweets = await scrapeNitterProfile(finalUsername, limit);
     console.log(`Fetched ${tweets.length} tweets from ${finalUsername} via Nitter`);
-    
     if (tweets.length > 0) {
-      // Determine which scraping method was used based on the tweet ID format
-      let scrapingMethod = 'Unknown';
-      if (tweets[0].id.startsWith('proxy-')) {
-        scrapingMethod = 'API Proxy';
-      } else if (tweets[0].id.startsWith('x-')) {
-        scrapingMethod = 'Direct Scraping';
-      } else {
-        scrapingMethod = 'Nitter';
-      }
-      
       return {
         tweets,
         success: true,
-        scrapingMethod
+        scrapingMethod: 'Nitter'
       };
     } else {
       return {
@@ -67,10 +53,10 @@ async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
       tweets: [],
       success: false,
       error: `Error retrieving tweets: ${error.message || 'Unknown error'}`,
-      details: (error as any).details || ['Twitter web scraping failed'],
+      details: (error as any).details || ['Nitter web scraping failed'],
       tips: (error as any).tips || [
         'Try again in a few minutes',
-        'Twitter has strong anti-scraping measures that can block automated access'
+        'Nitter instances may be rate-limited or down'
       ]
     };
   }
@@ -78,8 +64,8 @@ async function fetchTweetsFromUser(username: string, limit = 25): Promise<{
 
 // Function to periodically check for new tweets
 function startPeriodicTwitterSync(storage: IStorage) {
-  // Check for new tweets every 30 minutes instead of 15
-  const SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  // Check for new tweets every 3 minutes
+  const SYNC_INTERVAL = 3 * 60 * 1000; // 3 minutes
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5 * 60 * 1000; // 5 minutes
 

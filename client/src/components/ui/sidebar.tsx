@@ -90,6 +90,16 @@ const Sidebar = () => {
           <span className="material-icons mr-3">settings</span>
           <span>Settings</span>
         </Link>
+        
+        <Link 
+          href="/discord-integrations" 
+          className={`sidebar-item flex items-center p-3 text-[#212121] rounded-lg hover:bg-gray-100 ${
+            isActive("/discord-integrations") ? "active border-l-4 border-[#1976d2] bg-[rgba(25,118,210,0.1)]" : ""
+          }`}
+        >
+          <span className="material-icons mr-3">discord</span>
+          <span>Discord Integrations</span>
+        </Link>
       </nav>
       
       <div className="mt-auto p-4 border-t">
