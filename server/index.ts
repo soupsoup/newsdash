@@ -1,10 +1,10 @@
-console.log('Starting server/index.ts...');
-import express, { Request, Response, NextFunction } from 'express';
+// console.log('Starting server/index.ts...');
+import express from 'express';
 import cors from 'cors';
-import { checkDatabaseConnection } from './db';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { checkDatabaseConnection } from './db';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -15,8 +15,6 @@ const app = express();
 const port = process.env.PORT || 5052;
 
 app.use(cors());
-app.use(express.json());
-
 // Serve static files from the dist/public directory
 app.use(express.static(path.join(__dirname, '../dist/public')));
 
