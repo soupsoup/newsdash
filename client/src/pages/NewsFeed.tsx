@@ -147,13 +147,13 @@ const NewsFeed = () => {
 
       {/* News Items Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {[1, 2, 3, 4, 5, 6].map((n) => (
             <div key={n} className="h-48 bg-gray-100 animate-pulse rounded-lg"></div>
           ))}
         </div>
       ) : filteredNews.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {filteredNews.map((news) => (
             <div key={news.id} className="relative">
               <NewsCard 
@@ -161,7 +161,6 @@ const NewsFeed = () => {
                 onShare={handleShareNews}
                 onEdit={handleEditNews}
               />
-              
               {/* Hidden dropdown trigger for share platforms */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
