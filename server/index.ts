@@ -1,5 +1,5 @@
 // console.log('Starting server/index.ts...');
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -58,11 +58,6 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Serve the client-side app for all other routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/public/index.html'));
-});
-
 (async () => {
   const server = await registerRoutes(app);
 
@@ -82,6 +77,11 @@ app.get('*', (req, res) => {
   } else {
     serveStatic(app);
   }
+
+  // Serve the client-side app for all other routes - moved to end
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/public/index.html'));
+  });
 
   server.listen(port, () => {
     log(`Server running at http://localhost:${port}`);
